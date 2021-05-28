@@ -1,10 +1,26 @@
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
+//! # steamwebapi
+//!
+//! This library provides access to the steam web apis. Uses reqwest::blocking under the hood
+//! # Getting Started
+//! To access any web api that requires no authentication (file details) you need to create a new instance:
+//! ```rust
+//! use steamwebapi::Workshop;
+//! 
+//! //Either pass in a Some(reqwest::blocking::Client) or leave None for it to be autocreated
+//! let wsclient = Workshop::new(None);
+//! wsclient.get_file_details(&["fileid1"]);
+//! ```
+//! 
+//! # Using Authorized Methods 
+//! 
+//! Authorized methods are behind the AuthedWorkshop struct, which can be generated from a Workshop instance:
+//! ```rust
+//! use steamwebapi::{Workshop, AuthedWorkshop};
+//! 
+//! let wsclient = Workshop::new(None);
+//! let authed = wsclient.login("MY_API_KEY");
+//! authed.search_ids(...);
+//! ```
 
 use serde::{Deserialize, Serialize};
 use std::{fs, io, path::PathBuf, path::Path, collections::HashMap, fmt};
