@@ -88,7 +88,6 @@ pub struct DownloadEntry {
 
 pub struct Workshop {
     client: Client,
-    apikey: Option<String>,
 }
 
 pub struct AuthedWorkshop {
@@ -107,7 +106,6 @@ impl Workshop {
         };
         Workshop {
             client,
-            apikey: None,
         }
     }
 
@@ -179,12 +177,8 @@ impl Workshop {
     //TODO: Extract into builder
     ///Search for workshop items, returns only fileids
     ///Does not require api key by using https://jackz.me/scripts/workshop.php?mode=search
-    pub fn search_ids(&self, appid: u64, query: &str) -> Result<Vec<String>, reqwest::Error> {
-        if let None = &self.apikey {
-            panic!("No Steam Web API key was specified");
-        }
-
-        let details = &self.client.get("https://jackz.me/scripts/workshop.php?mode=search")
+    pub fn search_proxy_ids(&self, appid: u64, query: &str) -> Result<Vec<String>, reqwest::Error> {
+        let details = &self.client.get("https://jackz.me/l4d2/scripts/search_public.php?")
             .header("User-Agent", format!("L4D2-Workshop-Downloader/v{}", env!("CARGO_PKG_VERSION")))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .query(&[
@@ -205,14 +199,10 @@ impl Workshop {
         Ok(fileids)
     }
 
-    ///Searches for workshop items, returns full metadata
+    ///Searches for workshop items, returns full metadata.
     ///Does not require api key by using https://jackz.me/scripts/workshop.php?mode=search
-    pub fn search_full(&self, appid: u64, query: &str) -> Result<Vec<WorkshopItem>, reqwest::Error> {
-        if let None = &self.apikey {
-            panic!("No Steam Web API key was specified");
-        }
-
-        let details = &self.client.get("https://jackz.me/scripts/workshop.php?mode=search")
+    pub fn search_proxy_full(&self, appid: u64, query: &str) -> Result<Vec<WorkshopItem>, reqwest::Error> {
+        let details = &self.client.get("https://jackz.me/l4d2/scripts/search_public.php")
             .header("User-Agent", format!("L4D2-Workshop-Downloader/v{}", env!("CARGO_PKG_VERSION")))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .query(&[
@@ -221,7 +211,6 @@ impl Workshop {
                 ("search_text", query),
                 ("appid", &appid.to_string()),
                 ("return_metadata", "1"),
-                ("key", &self.apikey.as_ref().unwrap()),
             ])
             .send()?
             .json::<WSResponse<WorkshopItem>>()?;
