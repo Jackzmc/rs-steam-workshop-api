@@ -29,23 +29,23 @@ use reqwest::blocking::Client;
 #[derive(Serialize, Deserialize, Clone)]
 pub struct WorkshopItem {
     pub publishedfileid: String,
-    result: i8,
-    creator: String,
-    creator_app_id: u32,
-    consumer_app_id: u32,
+    pub result: i8,
+    pub creator: String,
+    pub creator_app_id: u32,
+    pub consumer_app_id: u32,
     pub filename: String,
     pub file_size: u64,
     pub file_url: String,
-    preview_url: String,
-    hcontent_preview: String,
+    pub preview_url: String,
+    pub hcontent_preview: String,
     pub title: String,
     pub description: String,
     pub time_created: usize,
     pub time_updated: usize,
-    subscriptions: u32,
-    favorited: u32,
-    views: u32,
-    tags: Vec<WorkshopItemTag>
+    pub subscriptions: u32,
+    pub favorited: u32,
+    pub views: u32,
+    pub tags: Vec<WorkshopItemTag>
 }
 
 impl fmt::Display for WorkshopItem {
