@@ -47,6 +47,8 @@ pub struct WorkshopItem {
     pub views: u32,
     pub tags: Vec<WorkshopItemTag>
 }
+
+#[derive(Serialize, Deserialize, Clone)]
 pub struct WorkshopSearchItem {
     pub result: i8,
     pub publishedfileid: String,
@@ -236,7 +238,7 @@ impl Workshop {
                 ("return_metadata", "1"),
             ])
             .send()?
-            .json::<Vec<WorkshopItem>>()?;
+            .json::<Vec<WorkshopSearchItem>>()?;
 
         Ok(details)
     }
@@ -282,7 +284,7 @@ impl AuthedWorkshop {
                 ("key", &self.apikey),
             ])
             .send()?
-            .json::<Vec<WorkshopItem>>()?;
+            .json::<Vec<WorkshopSearchItem>>()?;
 
         Ok(details)
     }
