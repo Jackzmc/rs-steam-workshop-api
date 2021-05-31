@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 use std::{fs, io, path::PathBuf, path::Path, collections::HashMap, fmt};
 use reqwest::blocking::Client;
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct WorkshopItem {
     pub result: i8,
     pub publishedfileid: String,
@@ -67,7 +67,7 @@ pub struct WorkshopSearchItem {
     pub subscriptions: u32,
     pub favorited: u32,
     pub views: u32,
-    //pub tags: Vec<WorkshopItemTag>
+    pub tags: Vec<WorkshopItemTag>
 }
 
 impl fmt::Display for WorkshopItem {
@@ -76,7 +76,7 @@ impl fmt::Display for WorkshopItem {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct WorkshopItemTag {
     tag: String
 }
@@ -99,6 +99,63 @@ struct WSSearchBody {
     result: u8,
     publishedfileid: String,
     language: u8
+}
+
+
+impl WorkshopSearchItem {
+    pub fn to_item(&self) -> WorkshopItem {
+        WorkshopItem {
+            result: self.result.clone(),
+            publishedfileid: self.publishedfileid.clone(),
+            creator: self.creator.clone(),
+            creator_app_id: self.creator_appid.clone(),
+            consumer_app_id: self.consumer_appid.clone(),
+            filename: self.filename.clone(),
+            file_size: self.file_size.parse().unwrap(),
+            file_url: self.file_url.clone(),
+            preview_url: self.preview_url.clone(),
+            hcontent_preview: self.hcontent_preview.clone(),
+            title: self.title.clone(),
+            description: self.file_description.clone(),
+            time_created: self.time_created,
+            time_updated: self.time_updated,
+            subscriptions: self.subscriptions,
+            favorited: self.favorited,
+            views: self.views,
+            tags: self.tags.clone(),
+        }
+    }
+    pub fn from_item(item: &WorkshopItem) -> WorkshopSearchItem {
+        WorkshopSearchItem {
+            result: item.result.clone(),
+            publishedfileid: item.publishedfileid.clone(),
+            creator: item.creator.clone(),
+            creator_appid: item.creator_app_id.clone(),
+            consumer_appid: item.consumer_app_id.clone(),
+            filename: item.filename.clone(),
+            file_size: item.file_size.to_string(),
+            file_url: item.file_url.clone(),
+            preview_url: item.preview_url.clone(),
+            hcontent_preview: item.hcontent_preview.clone(),
+            title: item.title.clone(),
+            file_description: item.description.clone(),
+            time_created: item.time_created,
+            time_updated: item.time_updated,
+            subscriptions: item.subscriptions,
+            favorited: item.favorited,
+            views: item.views,
+            tags: item.tags.clone(),
+        }
+    }
+}
+
+impl WorkshopItem {
+    pub fn to_search_item(&self) -> WorkshopSearchItem {
+        WorkshopSearchItem::from_item(&self)
+    }
+    pub fn from_search_item(sitem: &WorkshopSearchItem) -> WorkshopItem {
+        sitem.to_item()
+    }
 }
 
 pub struct Workshop {
