@@ -200,14 +200,14 @@ impl Workshop {
     //TODO: Set proxy url
     ///Search for workshop items, returns only fileids
     ///Does not require api key by using https://jackz.me/scripts/workshop.php?mode=search
-    pub fn search_proxy_ids(&self, appid: u64, query: &str) -> Result<Vec<String>, reqwest::Error> {
+    pub fn search_proxy_ids(&self, appid: u64, query: &str, count: usize) -> Result<Vec<String>, reqwest::Error> {
         let client = &self.client;
         let details = client.get("https://jackz.me/l4d2/scripts/search_public.php")
             .header("User-Agent", format!("L4D2-Workshop-Downloader/v{}", env!("CARGO_PKG_VERSION")))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .query(&[
                 ("page", "1"),
-                ("numperpage", "20"),
+                ("numperpage", &count.to_string()),
                 ("search_text", query),
                 ("appid", &appid.to_string()),
                 ("v", &env!("CARGO_PKG_VERSION")),
@@ -225,14 +225,14 @@ impl Workshop {
 
     ///Searches for workshop items, returns full metadata.
     ///Does not require api key by using https://jackz.me/scripts/workshop.php?mode=search
-    pub fn search_proxy_full(&self, appid: u64, query: &str) -> Result<Vec<WorkshopSearchItem>, reqwest::Error> {
+    pub fn search_proxy_full(&self, appid: u64, query: &str, count:usize) -> Result<Vec<WorkshopSearchItem>, reqwest::Error> {
         let client = &self.client;
         let details = client.get("https://jackz.me/l4d2/scripts/search_public.php")
             .header("User-Agent", format!("L4D2-Workshop-Downloader/v{}", env!("CARGO_PKG_VERSION")))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .query(&[
                 ("page", "1"),
-                ("numperpage", "20"),
+                ("numperpage", &count.to_string()),
                 ("search_text", query),
                 ("appid", &appid.to_string()),
                 ("return_metadata", "1"),
@@ -246,14 +246,14 @@ impl Workshop {
 
 impl AuthedWorkshop {
     ///Search for workshop items, returns only fileids
-    pub fn search_ids(&self, appid: u64, query: &str) -> Result<Vec<String>, reqwest::Error> {
+    pub fn search_ids(&self, appid: u64, query: &str, count: usize) -> Result<Vec<String>, reqwest::Error> {
         let client = &self.client;
         let details = client.get("https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/?")
             .header("User-Agent", format!("L4D2-Workshop-Downloader/v{}", env!("CARGO_PKG_VERSION")))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .query(&[
                 ("page", "1"),
-                ("numperpage", "20"),
+                ("numperpage", &count.to_string()),
                 ("search_text", query),
                 ("appid", &appid.to_string()),
                 ("key", &self.apikey),
@@ -270,14 +270,14 @@ impl AuthedWorkshop {
     }
 
     ///Searches for workshop items, returns full metadata
-    pub fn search_full(&self, appid: u64, query: &str) -> Result<Vec<WorkshopSearchItem>, reqwest::Error> {
+    pub fn search_full(&self, appid: u64, query: &str, count: usize) -> Result<Vec<WorkshopSearchItem>, reqwest::Error> {
         let client = &self.client;
         let details = client.get("https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/?")
             .header("User-Agent", format!("L4D2-Workshop-Downloader/v{}", env!("CARGO_PKG_VERSION")))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .query(&[
                 ("page", "1"),
-                ("numperpage", "20"),
+                ("numperpage", &count.to_string()),
                 ("search_text", query),
                 ("appid", &appid.to_string()),
                 ("return_metadata", "1"),
