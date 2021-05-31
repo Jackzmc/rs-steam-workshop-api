@@ -180,7 +180,7 @@ impl Workshop {
     ///Does not require api key by using https://jackz.me/scripts/workshop.php?mode=search
     pub fn search_proxy_ids(&self, appid: u64, query: &str) -> Result<Vec<String>, reqwest::Error> {
         let client = &self.client;
-        let details = client.get("https://jackz.me/l4d2/scripts/search_public.php?")
+        let details = client.get("https://jackz.me/l4d2/scripts/search_public.php")
             .header("User-Agent", format!("L4D2-Workshop-Downloader/v{}", env!("CARGO_PKG_VERSION")))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .query(&[
@@ -216,9 +216,9 @@ impl Workshop {
                 ("return_metadata", "1"),
             ])
             .send()?
-            .json::<WSResponse<WorkshopItem>>()?;
+            .json::<Vec<WorkshopItem>>()?;
 
-        Ok(details.response.publishedfiledetails)
+        Ok(details)
     }
 }
 
@@ -262,8 +262,8 @@ impl AuthedWorkshop {
                 ("key", &self.apikey),
             ])
             .send()?
-            .json::<WSResponse<WorkshopItem>>()?;
+            .json::<Vec<WorkshopItem>>()?;
 
-        Ok(details.response.publishedfiledetails.clone())
+        Ok(details)
     }
 }
