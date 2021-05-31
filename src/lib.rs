@@ -34,7 +34,7 @@ pub struct WorkshopItem {
     creator_app_id: u32,
     consumer_app_id: u32,
     pub filename: String,
-    pub file_size: usize,
+    pub file_size: u64,
     pub file_url: String,
     preview_url: String,
     hcontent_preview: String,
