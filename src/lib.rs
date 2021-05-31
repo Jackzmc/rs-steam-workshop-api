@@ -28,8 +28,8 @@ use reqwest::blocking::Client;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct WorkshopItem {
-    pub publishedfileid: String,
     pub result: i8,
+    pub publishedfileid: String,
     pub creator: String,
     pub creator_app_id: u32,
     pub consumer_app_id: u32,
@@ -46,6 +46,26 @@ pub struct WorkshopItem {
     pub favorited: u32,
     pub views: u32,
     pub tags: Vec<WorkshopItemTag>
+}
+pub struct WorkshopSearchItem {
+    pub result: i8,
+    pub publishedfileid: String,
+    pub creator: String,
+    pub creator_appid: u32,
+    pub consumer_appid: u32,
+    pub filename: String,
+    pub file_size: String,
+    pub file_url: String,
+    pub preview_url: String,
+    pub hcontent_preview: String,
+    pub title: String,
+    pub file_description: String,
+    pub time_created: usize,
+    pub time_updated: usize,
+    pub subscriptions: u32,
+    pub favorited: u32,
+    pub views: u32,
+    //pub tags: Vec<WorkshopItemTag>
 }
 
 impl fmt::Display for WorkshopItem {
@@ -203,7 +223,7 @@ impl Workshop {
 
     ///Searches for workshop items, returns full metadata.
     ///Does not require api key by using https://jackz.me/scripts/workshop.php?mode=search
-    pub fn search_proxy_full(&self, appid: u64, query: &str) -> Result<Vec<WorkshopItem>, reqwest::Error> {
+    pub fn search_proxy_full(&self, appid: u64, query: &str) -> Result<Vec<WorkshopSearchItem>, reqwest::Error> {
         let client = &self.client;
         let details = client.get("https://jackz.me/l4d2/scripts/search_public.php")
             .header("User-Agent", format!("L4D2-Workshop-Downloader/v{}", env!("CARGO_PKG_VERSION")))
@@ -248,7 +268,7 @@ impl AuthedWorkshop {
     }
 
     ///Searches for workshop items, returns full metadata
-    pub fn search_full(&self, appid: u64, query: &str) -> Result<Vec<WorkshopItem>, reqwest::Error> {
+    pub fn search_full(&self, appid: u64, query: &str) -> Result<Vec<WorkshopSearchItem>, reqwest::Error> {
         let client = &self.client;
         let details = client.get("https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/?")
             .header("User-Agent", format!("L4D2-Workshop-Downloader/v{}", env!("CARGO_PKG_VERSION")))
