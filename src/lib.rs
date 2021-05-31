@@ -101,13 +101,6 @@ struct WSSearchBody {
     language: u8
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct DownloadEntry {
-    pub title: String,
-    pub publishedfileid: String,
-    pub time_updated: usize
-}
-
 pub struct Workshop {
     client: Client,
 }
