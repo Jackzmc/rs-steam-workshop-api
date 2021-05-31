@@ -175,10 +175,12 @@ impl Workshop {
     }
 
     //TODO: Extract into builder
+    //TODO: Set proxy url
     ///Search for workshop items, returns only fileids
     ///Does not require api key by using https://jackz.me/scripts/workshop.php?mode=search
     pub fn search_proxy_ids(&self, appid: u64, query: &str) -> Result<Vec<String>, reqwest::Error> {
-        let details = &self.client.get("https://jackz.me/l4d2/scripts/search_public.php?")
+        let client = &self.client;
+        let details = client.get("https://jackz.me/l4d2/scripts/search_public.php?")
             .header("User-Agent", format!("L4D2-Workshop-Downloader/v{}", env!("CARGO_PKG_VERSION")))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .query(&[
@@ -202,7 +204,8 @@ impl Workshop {
     ///Searches for workshop items, returns full metadata.
     ///Does not require api key by using https://jackz.me/scripts/workshop.php?mode=search
     pub fn search_proxy_full(&self, appid: u64, query: &str) -> Result<Vec<WorkshopItem>, reqwest::Error> {
-        let details = &self.client.get("https://jackz.me/l4d2/scripts/search_public.php")
+        let client = &self.client;
+        let details = client.get("https://jackz.me/l4d2/scripts/search_public.php")
             .header("User-Agent", format!("L4D2-Workshop-Downloader/v{}", env!("CARGO_PKG_VERSION")))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .query(&[
@@ -215,14 +218,15 @@ impl Workshop {
             .send()?
             .json::<WSResponse<WorkshopItem>>()?;
 
-        Ok(details.response.publishedfiledetails.clone())
+        Ok(details.response.publishedfiledetails)
     }
 }
 
 impl AuthedWorkshop {
     ///Search for workshop items, returns only fileids
     pub fn search_ids(&self, appid: u64, query: &str) -> Result<Vec<String>, reqwest::Error> {
-        let details = self.client.get("https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/?")
+        let client = &self.client;
+        let details = client.get("https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/?")
             .header("User-Agent", format!("L4D2-Workshop-Downloader/v{}", env!("CARGO_PKG_VERSION")))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .query(&[
@@ -245,7 +249,8 @@ impl AuthedWorkshop {
 
     ///Searches for workshop items, returns full metadata
     pub fn search_full(&self, appid: u64, query: &str) -> Result<Vec<WorkshopItem>, reqwest::Error> {
-        let details = self.client.get("https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/?")
+        let client = &self.client;
+        let details = client.get("https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/?")
             .header("User-Agent", format!("L4D2-Workshop-Downloader/v{}", env!("CARGO_PKG_VERSION")))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .query(&[
