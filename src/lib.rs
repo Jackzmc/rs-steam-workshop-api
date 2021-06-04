@@ -348,7 +348,19 @@ impl Workshop {
 
         Ok(details)
     }
+    pub fn can_subscribe(&self, fileid: &str) -> Result<bool, reqwest::Error> {
+        let details: serde_json::Value = self.client
+            .get("https://api.steampowered.com/IPublishedFileService/CanSubscribe/v1/?key=7250BBE4BC2ECA0E16197B38E3675988&publishedfileid=122447941")
             .header("User-Agent", USER_AGENT.to_string())
+            .query(&[
+                "key", &self.apikey,
+                "publishedfileid", fileid
+            ])
+            .send()?
+            .error_for_status()?
+            .json()?;
+        Ok(details["response"]["can_subscribe"].as_bool().unwrap_or(false))
+    }
 }
 
 impl AuthedWorkshop {
