@@ -87,15 +87,11 @@ pub struct WorkshopItemTag {
 struct WSItemResponse<T> {
     response: WSItemResponseBody<T>
 }
-
-
 #[doc(hidden)]
 #[derive(Serialize, Deserialize)]
 struct WSItemResponseBody<T> {
     publishedfiledetails: Vec<T>
 }
-
-
 #[doc(hidden)]
 #[derive(Serialize, Deserialize)]
 struct WSSearchBody {
@@ -105,19 +101,24 @@ struct WSSearchBody {
 }
 
 // WORKSHOP COLLECTIONS:
-
 #[doc(hidden)]
 #[derive(Serialize, Deserialize)]
 struct WSCollectionResponse {
     response: WSCollectionResponseBody
 }
-
 #[doc(hidden)]
 #[derive(Serialize, Deserialize)]
 struct WSCollectionResponseBody {
     result: u8,
     resultcount: u8,
     collectiondetails: Vec<WSCollectionBody>
+}
+#[doc(hidden)]
+#[derive(Serialize, Deserialize)]
+struct WSCollectionBody {
+    publishedfileid: String,
+    result: u8,
+    children: Vec<WSCollectionChildren>
 }
 #[doc(hidden)]
 #[derive(Serialize, Deserialize)]
@@ -128,13 +129,7 @@ struct WSCollectionChildren {
 }
 // MISC
 
-#[doc(hidden)]
-#[derive(Serialize, Deserialize)]
-struct WSCollectionBody {
-    publishedfileid: String,
-    result: u8,
-    children: Vec<WSCollectionChildren>
-}
+
 
 
 impl WorkshopSearchItem {
@@ -287,11 +282,13 @@ impl Workshop {
     }
 
     pub fn get_file_children_ids(&self, fileid: &str) -> Result<Option<Vec<String>>, reqwest::Error> {
+        let mut params = HashMap::new();
+        params.insert("collectioncount", "1");
+        params.insert("publishedfileids[0]", &fileid);
         let details: WSCollectionResponse = self.client
             .post("https://api.steampowered.com/ISteamRemoteStorage/GetCollectionDetails/v1/")
             .header("User-Agent", format!("L4D2-Workshop-Downloader/v{}", env!("CARGO_PKG_VERSION")))
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .form(&format!("collectioncount=1&publishedfileids[0]={}", &fileid))
+            .form(&params)
             .send()?
             .error_for_status()?
             .json::<WSCollectionResponse>()?;
