@@ -8,7 +8,7 @@
 //! 
 //! //Either pass in a Some(reqwest::blocking::Client) or leave None for it to be autocreated
 //! let wsclient = Workshop::new(None);
-//! wsclient.get_file_details(&["fileid1"]);
+//! wsclient.get_published_file_details(&["fileid1"]);
 //! ```
 //! 
 //! # Using Authorized Methods 
@@ -20,6 +20,16 @@
 //! let wsclient = Workshop::new(None);
 //! let authed = wsclient.login("MY_API_KEY");
 //! authed.search_ids(...);
+//! ```
+//! # Using Proxied Methods 
+//! 
+//! Proxied methods are identical to AuthedWorkshop, except can use a third party server to proxy (and keep the appkey private)
+//! ```rust
+//! use steamwebapi::{Workshop, ProxyWorkshop};
+//! 
+//! let wsclient = Workshop::new(None);
+//! let proxy = wsclient.proxy("https://jackz.me/l4d2/scripts/search_public.php");
+//! proxy.search_ids(...);
 //! ```
 
 
@@ -223,11 +233,21 @@ impl Workshop {
         }
     }
 
-    ///Gets an authorized workshop, allows access to methods that require api keys. Get api keys from https://steamcommunity.com/dev/apikey
+    ///Gets an authorized workshop, allows access to methods that require api keys. 
+    ///Get api keys from https://steamcommunity.com/dev/apikey
     pub fn login(&mut self, apikey: String) -> AuthedWorkshop {
         AuthedWorkshop {
             apikey: apikey,
             client: self.client.clone()
+        }
+    }
+
+    /// Allows you to use AuthedWorkshop methods using a proxy to handle.
+    /// Public search proxy: https://jackz.me/scripts/workshop.php?mode=search
+    pub fn proxy(&self, url: String) -> ProxyWorkshop {
+        ProxyWorkshop {
+            client: self.client.clone(),
+            url: url
         }
     }
 
@@ -292,6 +312,7 @@ impl Workshop {
         Ok(details_final)
     }
 
+    /// Gets the collection details (all the children of this item). Returns a list of children fileids which can be sent directly to get_published_file_details()
     pub fn get_collection_details(&self, fileid: &str) -> Result<Option<Vec<String>>, reqwest::Error> {
         let mut params = HashMap::new();
         params.insert("collectioncount", "1");
@@ -315,15 +336,6 @@ impl Workshop {
         }
     }
 
-    /// Allows you to use AuthedWorkshop methods using a proxy to handle.
-    /// Public search proxy: https://jackz.me/scripts/workshop.php?mode=search
-    pub fn proxy(&self, url: String) -> ProxyWorkshop {
-        ProxyWorkshop {
-            client: self.client.clone(),
-            url: url
-        }
-    }
-    
 }
 
 impl AuthedWorkshop {
@@ -369,6 +381,7 @@ impl AuthedWorkshop {
         Ok(details)
     }
 
+    /// Check if the user can subscribe to the published file
     pub fn can_subscribe(&self, fileid: &str) -> Result<bool, reqwest::Error> {
         let details: serde_json::Value = self.client
             .get("https://api.steampowered.com/IPublishedFileService/CanSubscribe/v1/?key=7250BBE4BC2ECA0E16197B38E3675988&publishedfileid=122447941")
