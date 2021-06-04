@@ -205,6 +205,10 @@ pub struct AuthedWorkshop {
     client: Client,
 }
 
+pub struct ProxyWorkshop {
+    client: Client,
+    url: String
+}
 
 #[allow(dead_code)]
 impl Workshop {
@@ -311,9 +315,79 @@ impl Workshop {
         }
     }
 
-    //TODO: Extract into builder
-    //TODO: Set proxy url
+    /// Allows you to use AuthedWorkshop methods using a proxy to handle.
+    /// Public search proxy: https://jackz.me/scripts/workshop.php?mode=search
+    pub fn proxy(&self, url: String) -> ProxyWorkshop {
+        ProxyWorkshop {
+            client: self.client.clone(),
+            url: url
+        }
+    }
+    
+}
+
+impl AuthedWorkshop {
     ///Search for workshop items, returns only fileids
+    pub fn search_ids(&self, appid: u64, query: &str, count: usize) -> Result<Vec<String>, reqwest::Error> {
+        let details = self.client.get("https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/?")
+            .header("User-Agent", USER_AGENT.to_string())
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .query(&[
+                ("page", "1"),
+                ("numperpage", &count.to_string()),
+                ("search_text", query),
+                ("appid", &appid.to_string()),
+                ("key", &self.apikey),
+            ])
+            .send()?
+            .json::<WSItemResponse<WSSearchBody>>()?;
+
+        let mut fileids: Vec<String> = Vec::new();
+
+        for res in &details.response.publishedfiledetails {
+            fileids.push(res.publishedfileid.to_string());
+        }
+        Ok(fileids)
+    }
+
+    ///Searches for workshop items, returns full metadata
+    pub fn search_full(&self, appid: u64, query: &str, count: usize) -> Result<Vec<WorkshopSearchItem>, reqwest::Error> {
+        let details = self.client.get("https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/?")
+            .header("User-Agent", USER_AGENT.to_string())
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .query(&[
+                ("page", "1"),
+                ("numperpage", &count.to_string()),
+                ("search_text", query),
+                ("appid", &appid.to_string()),
+                ("return_metadata", "1"),
+                ("key", &self.apikey),
+            ])
+            .send()?
+            .json::<Vec<WorkshopSearchItem>>()?;
+
+        Ok(details)
+    }
+
+    pub fn can_subscribe(&self, fileid: &str) -> Result<bool, reqwest::Error> {
+        let details: serde_json::Value = self.client
+            .get("https://api.steampowered.com/IPublishedFileService/CanSubscribe/v1/?key=7250BBE4BC2ECA0E16197B38E3675988&publishedfileid=122447941")
+            .header("User-Agent", USER_AGENT.to_string())
+            .query(&[
+                "key", &self.apikey,
+                "publishedfileid", fileid
+            ])
+            .send()?
+            .error_for_status()?
+            .json()?;
+        Ok(details["response"]["can_subscribe"].as_bool().unwrap_or(false))
+    }
+}
+
+
+impl ProxyWorkshop {
+    pub fn search_ids(&self, appid: u64, query: &str, count: usize) -> Result<Vec<String>, reqwest::Error> {
+        let details = self.client.get(&self.url)
             .header("User-Agent", USER_AGENT.to_string())
             .header("Content-Type", "application/x-www-form-urlencoded")
             .query(&[
@@ -334,6 +408,10 @@ impl Workshop {
         Ok(fileids)
     }
 
+    ///Searches for workshop items, returns full metadata.
+    ///Does not require api key by using https://jackz.me/scripts/workshop.php?mode=search
+    pub fn search_full(&self, appid: u64, query: &str, count:usize) -> Result<Vec<WorkshopSearchItem>, reqwest::Error> {
+        let details = self.client.get(&self.url)
             .header("User-Agent", USER_AGENT.to_string())
             .header("Content-Type", "application/x-www-form-urlencoded")
             .query(&[
@@ -342,59 +420,6 @@ impl Workshop {
                 ("search_text", query),
                 ("appid", &appid.to_string()),
                 ("return_metadata", "1"),
-            ])
-            .send()?
-            .json::<Vec<WorkshopSearchItem>>()?;
-
-        Ok(details)
-    }
-    pub fn can_subscribe(&self, fileid: &str) -> Result<bool, reqwest::Error> {
-        let details: serde_json::Value = self.client
-            .get("https://api.steampowered.com/IPublishedFileService/CanSubscribe/v1/?key=7250BBE4BC2ECA0E16197B38E3675988&publishedfileid=122447941")
-            .header("User-Agent", USER_AGENT.to_string())
-            .query(&[
-                "key", &self.apikey,
-                "publishedfileid", fileid
-            ])
-            .send()?
-            .error_for_status()?
-            .json()?;
-        Ok(details["response"]["can_subscribe"].as_bool().unwrap_or(false))
-    }
-}
-
-impl AuthedWorkshop {
-    ///Search for workshop items, returns only fileids
-    pub fn search_ids(&self, appid: u64, query: &str, count: usize) -> Result<Vec<String>, reqwest::Error> {
-            .header("User-Agent", USER_AGENT.to_string())
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .query(&[
-                ("page", "1"),
-                ("numperpage", &count.to_string()),
-                ("search_text", query),
-                ("appid", &appid.to_string()),
-                ("key", &self.apikey),
-            ])
-            .send()?
-            .json::<WSItemResponse<WSSearchBody>>()?;
-
-        let mut fileids: Vec<String> = Vec::new();
-
-        for res in &details.response.publishedfiledetails {
-            fileids.push(res.publishedfileid.to_string());
-        }
-        Ok(fileids)
-    }
-
-            .header("User-Agent", USER_AGENT.to_string())
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .query(&[
-                ("page", "1"),
-                ("numperpage", &count.to_string()),
-                ("search_text", query),
-                ("appid", &appid.to_string()),
-                ("return_metadata", "1"),
-                ("key", &self.apikey),
             ])
             .send()?
             .json::<Vec<WorkshopSearchItem>>()?;
