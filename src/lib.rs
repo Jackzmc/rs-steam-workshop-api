@@ -259,7 +259,7 @@ impl Workshop {
     }
 
     /// Fetches the latest WorkshopItem per each addon id
-    pub fn get_file_details(&self, fileids: &[String]) -> Result<Vec<WorkshopItem>, reqwest::Error> {
+    pub fn get_published_file_details(&self, fileids: &[String]) -> Result<Vec<WorkshopItem>, reqwest::Error> {
         let mut params = HashMap::new();
         let length = fileids.len().to_string();
         params.insert("itemcount".to_string(), length);
@@ -288,7 +288,7 @@ impl Workshop {
         Ok(details_final)
     }
 
-    pub fn get_file_children_ids(&self, fileid: &str) -> Result<Option<Vec<String>>, reqwest::Error> {
+    pub fn get_collection_details(&self, fileid: &str) -> Result<Option<Vec<String>>, reqwest::Error> {
         let mut params = HashMap::new();
         params.insert("collectioncount", "1");
         params.insert("publishedfileids[0]", &fileid);
