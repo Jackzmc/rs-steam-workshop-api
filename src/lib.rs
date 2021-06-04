@@ -1,10 +1,10 @@
-//! # steamwebapi
+//! # steam_workshop_api
 //!
 //! This library provides access to the steam web apis. Uses reqwest::blocking under the hood
 //! # Getting Started
 //! To access any web api that requires no authentication (file details) you need to create a new instance:
 //! ```rust
-//! use steamwebapi::Workshop;
+//! use steam_workshop_api::Workshop;
 //! 
 //! //Either pass in a Some(reqwest::blocking::Client) or leave None for it to be autocreated
 //! let wsclient = Workshop::new(None);
@@ -15,7 +15,7 @@
 //! 
 //! Authorized methods are behind the AuthedWorkshop struct, which can be generated from a Workshop instance:
 //! ```rust
-//! use steamwebapi::{Workshop, AuthedWorkshop};
+//! use steam_workshop_api::{Workshop, AuthedWorkshop};
 //! 
 //! let wsclient = Workshop::new(None);
 //! let authed = wsclient.login("MY_API_KEY");
@@ -25,7 +25,7 @@
 //! 
 //! Proxied methods are identical to AuthedWorkshop, except can use a third party server to proxy (and keep the appkey private)
 //! ```rust
-//! use steamwebapi::{Workshop, ProxyWorkshop};
+//! use steam_workshop_api::{Workshop, ProxyWorkshop};
 //! 
 //! let wsclient = Workshop::new(None);
 //! let proxy = wsclient.proxy("https://jackz.me/l4d2/scripts/search_public.php");
@@ -151,6 +151,7 @@ struct WSCollectionChildren {
 
 
 impl WorkshopSearchItem {
+    /// Converts from a WorkshopSearchItem to a WorkshopItem
     pub fn to_item(&self) -> WorkshopItem {
         WorkshopItem {
             result: self.result.clone(),
@@ -173,6 +174,7 @@ impl WorkshopSearchItem {
             tags: self.tags.clone(),
         }
     }
+    /// Converts to a WorkshopSearchItem from a WorkshopItem
     pub fn from_item(item: &WorkshopItem) -> WorkshopSearchItem {
         WorkshopSearchItem {
             result: item.result.clone(),
@@ -198,9 +200,11 @@ impl WorkshopSearchItem {
 }
 
 impl WorkshopItem {
+    /// Converts from a WorkshopItem to a WorkshopSearchItem
     pub fn to_search_item(&self) -> WorkshopSearchItem {
         WorkshopSearchItem::from_item(&self)
     }
+    /// Converts to a WorkshopItem from a WorkshopSearchItem
     pub fn from_search_item(sitem: &WorkshopSearchItem) -> WorkshopItem {
         sitem.to_item()
     }
@@ -222,7 +226,7 @@ pub struct ProxyWorkshop {
 
 #[allow(dead_code)]
 impl Workshop {
-    ///Creates a new workshop instance
+    ///Creates a new workshop instance, client will be auto created if None
     pub fn new(client: Option<Client>) -> Workshop {
         let client = match client {
             Some(client) => client,
@@ -399,6 +403,7 @@ impl AuthedWorkshop {
 
 
 impl ProxyWorkshop {
+    ///Searches for workshop items, returns their file ids
     pub fn search_ids(&self, appid: u64, query: &str, count: usize) -> Result<Vec<String>, reqwest::Error> {
         let details = self.client.get(&self.url)
             .header("User-Agent", USER_AGENT.to_string())

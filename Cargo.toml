@@ -1,8 +1,8 @@
 [package]
 name = "steam-workshop-api"
-description = "Provides an API wrapper for the steam workshop interfaces (IPublishedFileService and ISteamRemoteStorage), with the addition of proxy and api key support"
+description = "Provides an API wrapper for the steam workshop interfaces (IPublishedFileService and ISteamRemoteStorage) with the addition of proxy and api key support"
 repository = "https://github.com/Jackzmc/rs-steam-workshop-api"
-license-file = "LICENSE"
+license = "MIT"
 keywords = ["steamapi", "workshop", "steam_workshop"]
 categories = ["api-bindings"]
 version = "0.2.0"
