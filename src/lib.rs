@@ -22,6 +22,14 @@
 //! authed.search_ids(...);
 //! ```
 
+
+use lazy_static::lazy_static;
+
+lazy_static! {
+    static ref USER_AGENT: String = format!("{}/v{}", "rs-steamwebapi", env!("CARGO_PKG_VERSION"));
+}
+
+
 use serde::{Deserialize, Serialize};
 use std::{fs, io, path::PathBuf, path::Path, collections::HashMap, fmt};
 use reqwest::blocking::Client;
@@ -264,8 +272,7 @@ impl Workshop {
         }
         let details: WSItemResponse<WorkshopItem> = self.client
             .post("https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/")
-            .header("User-Agent", format!("L4D2-Workshop-Downloader/v{}", env!("CARGO_PKG_VERSION")))
-            .header("Content-Type", "application/x-www-form-urlencoded")
+            .header("User-Agent", &USER_AGENT.to_string())
             .form(&params)
             .send()?
             .error_for_status()?
@@ -287,7 +294,7 @@ impl Workshop {
         params.insert("publishedfileids[0]", &fileid);
         let details: WSCollectionResponse = self.client
             .post("https://api.steampowered.com/ISteamRemoteStorage/GetCollectionDetails/v1/")
-            .header("User-Agent", format!("L4D2-Workshop-Downloader/v{}", env!("CARGO_PKG_VERSION")))
+            .header("User-Agent", USER_AGENT.to_string())
             .form(&params)
             .send()?
             .error_for_status()?
@@ -307,10 +314,7 @@ impl Workshop {
     //TODO: Extract into builder
     //TODO: Set proxy url
     ///Search for workshop items, returns only fileids
-    ///Does not require api key by using https://jackz.me/scripts/workshop.php?mode=search
-    pub fn search_proxy_ids(&self, appid: u64, query: &str, count: usize) -> Result<Vec<String>, reqwest::Error> {
-        let details = self.client.get("https://jackz.me/l4d2/scripts/search_public.php")
-            .header("User-Agent", format!("L4D2-Workshop-Downloader/v{}", env!("CARGO_PKG_VERSION")))
+            .header("User-Agent", USER_AGENT.to_string())
             .header("Content-Type", "application/x-www-form-urlencoded")
             .query(&[
                 ("page", "1"),
@@ -330,11 +334,7 @@ impl Workshop {
         Ok(fileids)
     }
 
-    ///Searches for workshop items, returns full metadata.
-    ///Does not require api key by using https://jackz.me/scripts/workshop.php?mode=search
-    pub fn search_proxy_full(&self, appid: u64, query: &str, count:usize) -> Result<Vec<WorkshopSearchItem>, reqwest::Error> {
-        let details = self.client.get("https://jackz.me/l4d2/scripts/search_public.php")
-            .header("User-Agent", format!("L4D2-Workshop-Downloader/v{}", env!("CARGO_PKG_VERSION")))
+            .header("User-Agent", USER_AGENT.to_string())
             .header("Content-Type", "application/x-www-form-urlencoded")
             .query(&[
                 ("page", "1"),
@@ -348,13 +348,13 @@ impl Workshop {
 
         Ok(details)
     }
+            .header("User-Agent", USER_AGENT.to_string())
 }
 
 impl AuthedWorkshop {
     ///Search for workshop items, returns only fileids
     pub fn search_ids(&self, appid: u64, query: &str, count: usize) -> Result<Vec<String>, reqwest::Error> {
-        let details = self.client.get("https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/?")
-            .header("User-Agent", format!("L4D2-Workshop-Downloader/v{}", env!("CARGO_PKG_VERSION")))
+            .header("User-Agent", USER_AGENT.to_string())
             .header("Content-Type", "application/x-www-form-urlencoded")
             .query(&[
                 ("page", "1"),
@@ -374,10 +374,7 @@ impl AuthedWorkshop {
         Ok(fileids)
     }
 
-    ///Searches for workshop items, returns full metadata
-    pub fn search_full(&self, appid: u64, query: &str, count: usize) -> Result<Vec<WorkshopSearchItem>, reqwest::Error> {
-        let details = self.client.get("https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/?")
-            .header("User-Agent", format!("L4D2-Workshop-Downloader/v{}", env!("CARGO_PKG_VERSION")))
+            .header("User-Agent", USER_AGENT.to_string())
             .header("Content-Type", "application/x-www-form-urlencoded")
             .query(&[
                 ("page", "1"),
