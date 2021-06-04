@@ -2,7 +2,7 @@
 name = "steamwebapi"
 description = "Provides an API wrapper for the steam workshop interfaces (IPublishedFileService and ISteamRemoteStorage), with the addition of proxy and api key support"
 repository = "https://github.com/jackzmc/rs-steamwebapi/"
-license_file = "LICENSE"
+license-file = "LICENSE"
 keywords = ["steamapi", "workshop", "steam_workshop"]
 categories = ["api-bindings"]
 version = "0.2.0"
