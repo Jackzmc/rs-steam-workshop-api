@@ -81,17 +81,20 @@ pub struct WorkshopItemTag {
     tag: String
 }
 
+// WORKSHOP ITEMS:
 #[doc(hidden)]
 #[derive(Serialize, Deserialize)]
-struct WSResponse<T> {
-    response: WSResponseBody<T>
+struct WSItemResponse<T> {
+    response: WSItemResponseBody<T>
 }
+
 
 #[doc(hidden)]
 #[derive(Serialize, Deserialize)]
-struct WSResponseBody<T> {
+struct WSItemResponseBody<T> {
     publishedfiledetails: Vec<T>
 }
+
 
 #[doc(hidden)]
 #[derive(Serialize, Deserialize)]
@@ -99,6 +102,38 @@ struct WSSearchBody {
     result: u8,
     publishedfileid: String,
     language: u8
+}
+
+// WORKSHOP COLLECTIONS:
+
+#[doc(hidden)]
+#[derive(Serialize, Deserialize)]
+struct WSCollectionResponse {
+    response: WSCollectionResponseBody
+}
+
+#[doc(hidden)]
+#[derive(Serialize, Deserialize)]
+struct WSCollectionResponseBody {
+    result: u8,
+    resultcount: u8,
+    collectiondetails: Vec<WSCollectionBody>
+}
+#[doc(hidden)]
+#[derive(Serialize, Deserialize)]
+struct WSCollectionChildren {
+    publishedfileid: String,
+    sortorder: u8,
+    filetype: u8
+}
+// MISC
+
+#[doc(hidden)]
+#[derive(Serialize, Deserialize)]
+struct WSCollectionBody {
+    publishedfileid: String,
+    result: u8,
+    children: Vec<WSCollectionChildren>
 }
 
 
@@ -232,14 +267,14 @@ impl Workshop {
             let name = format!("publishedfileids[{i}]", i=i);
             params.insert(name, vpk.to_string());
         }
-        let details: WSResponse<WorkshopItem> = self.client
+        let details: WSItemResponse<WorkshopItem> = self.client
             .post("https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/")
             .header("User-Agent", format!("L4D2-Workshop-Downloader/v{}", env!("CARGO_PKG_VERSION")))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .form(&params)
             .send()?
             .error_for_status()?
-            .json::<WSResponse<WorkshopItem>>()?;
+            .json::<WSItemResponse<WorkshopItem>>()?;
            
     
         let mut details_final: Vec<WorkshopItem> = Vec::new();
@@ -249,6 +284,27 @@ impl Workshop {
         }
     
         Ok(details_final)
+    }
+
+    pub fn get_file_children_ids(&self, fileid: &str) -> Result<Option<Vec<String>>, reqwest::Error> {
+        let details: WSCollectionResponse = self.client
+            .post("https://api.steampowered.com/ISteamRemoteStorage/GetCollectionDetails/v1/")
+            .header("User-Agent", format!("L4D2-Workshop-Downloader/v{}", env!("CARGO_PKG_VERSION")))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .form(&format!("collectioncount=1&publishedfileids[0]={}", &fileid))
+            .send()?
+            .error_for_status()?
+            .json::<WSCollectionResponse>()?;
+           
+        if details.response.resultcount > 0 { 
+            let mut ids: Vec<String>  = Vec::new();
+            for children in &details.response.collectiondetails[0].children {
+                ids.push(children.publishedfileid.to_string());
+            }
+            Ok(Some(ids))
+        } else {
+            Ok(None)
+        }
     }
 
     //TODO: Extract into builder
@@ -267,7 +323,7 @@ impl Workshop {
                 ("v", &env!("CARGO_PKG_VERSION")),
             ])
             .send()?
-            .json::<WSResponse<WSSearchBody>>()?;
+            .json::<WSItemResponse<WSSearchBody>>()?;
 
         let mut fileids: Vec<String> = Vec::new();
 
@@ -311,7 +367,7 @@ impl AuthedWorkshop {
                 ("key", &self.apikey),
             ])
             .send()?
-            .json::<WSResponse<WSSearchBody>>()?;
+            .json::<WSItemResponse<WSSearchBody>>()?;
 
         let mut fileids: Vec<String> = Vec::new();
 
