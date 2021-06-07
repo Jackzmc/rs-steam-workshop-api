@@ -103,7 +103,8 @@ pub struct WorkshopItemTag {
 #[doc(hidden)]
 #[derive(Serialize, Deserialize)]
 struct WSItemResponse<T> {
-    response: WSItemResponseBody<T>
+    response: WSItemResponseBody<T>,
+    total: Option<u8>
 }
 #[doc(hidden)]
 #[derive(Serialize, Deserialize)]
@@ -358,9 +359,10 @@ impl AuthedWorkshop {
             .json::<WSItemResponse<WSSearchIdBody>>()?;
 
         let mut fileids: Vec<String> = Vec::new();
-
-        for res in &details.response.publishedfiledetails {
-            fileids.push(res.publishedfileid.to_string());
+        if details.total.unwrap() > 0 {
+            for res in &details.response.publishedfiledetails {
+                fileids.push(res.publishedfileid.to_string());
+            }
         }
         Ok(fileids)
     }
@@ -380,7 +382,12 @@ impl AuthedWorkshop {
             ])
             .send()?
             .json::<WSItemResponse<WorkshopSearchItem>>()?;
-        Ok(details.response.publishedfiledetails)
+        //Search always returns total
+        if details.total.unwrap() > 0 {
+            Ok(details.response.publishedfiledetails)
+        } else {
+            Ok(vec!())
+        }
     }
 
     /// Check if the user can subscribe to the published file
@@ -417,9 +424,10 @@ impl ProxyWorkshop {
             .json::<WSItemResponse<WSSearchIdBody>>()?;
 
         let mut fileids: Vec<String> = Vec::new();
-
-        for res in &details.response.publishedfiledetails {
-            fileids.push(res.publishedfileid.to_string());
+        if details.total.unwrap() > 0 {
+            for res in &details.response.publishedfiledetails {
+                fileids.push(res.publishedfileid.to_string());
+            }
         }
         Ok(fileids)
     }
@@ -440,6 +448,11 @@ impl ProxyWorkshop {
             .send()?
             .json::<WSItemResponse<WorkshopSearchItem>>()?;
 
-        Ok(details.response.publishedfiledetails)
+        //Search always returns total
+        if details.total.unwrap() > 0 {
+            Ok(details.response.publishedfiledetails)
+        } else {
+            Ok(vec!())
+        }
     }
 }
