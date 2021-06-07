@@ -103,8 +103,7 @@ pub struct WorkshopItemTag {
 #[doc(hidden)]
 #[derive(Serialize, Deserialize)]
 struct WSItemResponse<T> {
-    response: WSItemResponseBody<T>,
-    total: Option<u8>
+    response: WSItemResponseBody<T>
 }
 #[doc(hidden)]
 #[derive(Serialize, Deserialize)]
@@ -117,6 +116,15 @@ struct WSSearchIdBody {
     result: u8,
     publishedfileid: String,
 }
+
+// SEARCH ITEMs
+#[doc(hidden)]
+#[derive(Serialize, Deserialize)]
+struct WSSearchResponse<T> {
+    response: Option<WSItemResponseBody<T>>,
+    total: u8
+}
+
 
 // WORKSHOP COLLECTIONS:
 #[doc(hidden)]
@@ -356,11 +364,11 @@ impl AuthedWorkshop {
                 ("key", &self.apikey),
             ])
             .send()?
-            .json::<WSItemResponse<WSSearchIdBody>>()?;
+            .json::<WSSearchResponse<WSSearchIdBody>>()?;
 
         let mut fileids: Vec<String> = Vec::new();
-        if details.total.unwrap() > 0 {
-            for res in &details.response.publishedfiledetails {
+        if details.total > 0 {
+            for res in &details.response.unwrap().publishedfiledetails {
                 fileids.push(res.publishedfileid.to_string());
             }
         }
@@ -381,10 +389,10 @@ impl AuthedWorkshop {
                 ("key", &self.apikey),
             ])
             .send()?
-            .json::<WSItemResponse<WorkshopSearchItem>>()?;
-        //Search always returns total
-        if details.total.unwrap() > 0 {
-            Ok(details.response.publishedfiledetails)
+            .json::<WSSearchResponse<WorkshopSearchItem>>()?;
+
+        if details.total > 0 {
+            Ok(details.response.unwrap().publishedfiledetails)
         } else {
             Ok(vec!())
         }
@@ -421,11 +429,11 @@ impl ProxyWorkshop {
                 ("v", &env!("CARGO_PKG_VERSION")),
             ])
             .send()?
-            .json::<WSItemResponse<WSSearchIdBody>>()?;
+            .json::<WSSearchResponse<WSSearchIdBody>>()?;
 
         let mut fileids: Vec<String> = Vec::new();
-        if details.total.unwrap() > 0 {
-            for res in &details.response.publishedfiledetails {
+        if details.total > 0 {
+            for res in &details.response.unwrap().publishedfiledetails {
                 fileids.push(res.publishedfileid.to_string());
             }
         }
@@ -446,11 +454,10 @@ impl ProxyWorkshop {
                 ("return_metadata", "1"),
             ])
             .send()?
-            .json::<WSItemResponse<WorkshopSearchItem>>()?;
+            .json::<WSSearchResponse<WorkshopSearchItem>>()?;
 
-        //Search always returns total
-        if details.total.unwrap() > 0 {
-            Ok(details.response.publishedfiledetails)
+        if details.total > 0 {
+            Ok(details.response.unwrap().publishedfiledetails)
         } else {
             Ok(vec!())
         }
