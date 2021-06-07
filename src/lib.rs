@@ -112,10 +112,9 @@ struct WSItemResponseBody<T> {
 }
 #[doc(hidden)]
 #[derive(Serialize, Deserialize)]
-struct WSSearchBody {
+struct WSSearchIdBody {
     result: u8,
     publishedfileid: String,
-    language: u8
 }
 
 // WORKSHOP COLLECTIONS:
@@ -356,7 +355,7 @@ impl AuthedWorkshop {
                 ("key", &self.apikey),
             ])
             .send()?
-            .json::<WSItemResponse<WSSearchBody>>()?;
+            .json::<WSItemResponse<WSSearchIdBody>>()?;
 
         let mut fileids: Vec<String> = Vec::new();
 
@@ -380,9 +379,8 @@ impl AuthedWorkshop {
                 ("key", &self.apikey),
             ])
             .send()?
-            .json::<Vec<WorkshopSearchItem>>()?;
-
-        Ok(details)
+            .json::<WSItemResponse<WorkshopSearchItem>>()?;
+        Ok(details.response.publishedfiledetails)
     }
 
     /// Check if the user can subscribe to the published file
@@ -416,7 +414,7 @@ impl ProxyWorkshop {
                 ("v", &env!("CARGO_PKG_VERSION")),
             ])
             .send()?
-            .json::<WSItemResponse<WSSearchBody>>()?;
+            .json::<WSItemResponse<WSSearchIdBody>>()?;
 
         let mut fileids: Vec<String> = Vec::new();
 
@@ -440,8 +438,8 @@ impl ProxyWorkshop {
                 ("return_metadata", "1"),
             ])
             .send()?
-            .json::<Vec<WorkshopSearchItem>>()?;
+            .json::<WSItemResponse<WorkshopSearchItem>>()?;
 
-        Ok(details)
+        Ok(details.response.publishedfiledetails)
     }
 }
