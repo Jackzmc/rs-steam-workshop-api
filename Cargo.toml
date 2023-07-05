@@ -5,7 +5,7 @@ repository = "https://github.com/Jackzmc/rs-steam-workshop-api"
 license = "MIT"
 keywords = ["steamapi", "workshop", "steam_workshop"]
 categories = ["api-bindings"]
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Jackz <me@jackz.me>"]
 edition = "2018"
 

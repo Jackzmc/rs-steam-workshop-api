@@ -139,6 +139,7 @@ struct WSCollectionChildren {
     sortorder: u8,
     filetype: u8
 }
+#[derive(Clone)]
 pub struct Workshop {
     client: Client,
 }
@@ -177,7 +178,7 @@ impl Workshop {
 
     /// Allows you to use AuthedWorkshop methods using a proxy to handle.
     /// Public search proxy: https://jackz.me/scripts/workshop.php?mode=search
-    pub fn proxy(self, url: String) -> ProxyWorkshop {
+    pub fn proxy(&self, url: String) -> ProxyWorkshop {
         ProxyWorkshop {
             url: url,
             client: self.client.clone(),
