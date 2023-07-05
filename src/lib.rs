@@ -159,7 +159,7 @@ impl Workshop {
     pub fn new(client: Option<Client>) -> Workshop {
         let client = match client {
             Some(client) => client,
-            None => reqwest::blocking::Client::new()
+            None => Client::new()
         };
         Workshop {
             client,
@@ -325,7 +325,7 @@ impl AuthedWorkshop {
 
     /// Check if the user can subscribe to the published file
     pub fn can_subscribe(&self, fileid: &str) -> Result<bool, reqwest::Error> {
-        let details: serde_json::Value = self.client
+        let details: Value = self.client
             .get("https://api.steampowered.com/IPublishedFileService/CanSubscribe/v1/?key=7250BBE4BC2ECA0E16197B38E3675988&publishedfileid=122447941")
             .header("User-Agent", USER_AGENT.to_string())
             .query(&[
