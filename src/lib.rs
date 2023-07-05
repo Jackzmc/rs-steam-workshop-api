@@ -306,22 +306,29 @@ impl Workshop {
             let name = format!("publishedfileids[{i}]", i=i);
             params.insert(name, vpk.to_string());
         }
-        let details: WSItemResponse<WorkshopItem> = self.client
+        let mut details = self.client
             .post("https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/")
             .header("User-Agent", &USER_AGENT.to_string())
             .form(&params)
             .send()?
             .error_for_status()?
-            .json::<WSItemResponse<WorkshopItem>>()?;
-           
-    
-        let mut details_final: Vec<WorkshopItem> = Vec::new();
-    
-        for detail in details.response.publishedfiledetails {
-            details_final.push(detail);
-        }
-    
-        Ok(details_final)
+            .json::<Value>()?;
+
+        Ok(details["response"]["publishedfiledetails"].as_array_mut().unwrap().iter_mut()
+            .filter(|v| v["result"] == 1)
+            .map(|v| serde_json::from_value(v.take()).unwrap())
+            .collect()
+        )
+
+        // let mut details_final: Vec<WorkshopItem> = Vec::new();
+        //
+        // for detail in details["response"]["publishedfiledetails"] {
+        //     if detail.result == 1 {
+        //         details_final.push(serde_json::from_value(detail).unwrap());
+        //     }
+        // }
+        //
+        // Ok(details_final)
     }
 
     /// Gets the collection details (all the children of this item). Returns a list of children fileids which can be sent directly to get_published_file_details()
