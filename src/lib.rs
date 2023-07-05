@@ -8,7 +8,7 @@
 //! 
 //! //Either pass in a Some(reqwest::blocking::Client) or leave None for it to be autocreated
 //! let wsclient = Workshop::new(None);
-//! wsclient.get_published_file_details(&["fileid1"]);
+//! wsclient.get_published_file_details(&["fileid1".to_string()]);
 //! ```
 //! 
 //! # Using Authorized Methods 
@@ -32,24 +32,25 @@
 //! proxy.search_ids(...);
 //! ```
 
-
 use lazy_static::lazy_static;
 
 lazy_static! {
     static ref USER_AGENT: String = format!("{}/v{}", "rs-steamwebapi", env!("CARGO_PKG_VERSION"));
 }
 
-
 use serde::{Deserialize, Serialize};
 use std::{fs, io, path::PathBuf, path::Path, collections::HashMap, fmt};
 use reqwest::blocking::Client;
+use serde_json::Value;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct WorkshopItem {
     pub result: i8,
     pub publishedfileid: String,
     pub creator: String,
+    #[serde(alias = "creator_appid")]
     pub creator_app_id: u32,
+    #[serde(alias = "consumer_appid")]
     pub consumer_app_id: u32,
     pub filename: String,
     pub file_size: u64,
@@ -57,6 +58,7 @@ pub struct WorkshopItem {
     pub preview_url: String,
     pub hcontent_preview: String,
     pub title: String,
+    #[serde(alias = "file_description")]
     pub description: String,
     pub time_created: usize,
     pub time_updated: usize,
@@ -66,26 +68,10 @@ pub struct WorkshopItem {
     pub tags: Vec<WorkshopItemTag>
 }
 
-#[derive(Serialize, Deserialize, Clone)]
-pub struct WorkshopSearchItem {
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
+pub struct ItemResponse {
     pub result: i8,
     pub publishedfileid: String,
-    pub creator: String,
-    pub creator_appid: u32,
-    pub consumer_appid: u32,
-    pub filename: String,
-    pub file_size: String,
-    pub file_url: String,
-    pub preview_url: String,
-    pub hcontent_preview: String,
-    pub title: String,
-    pub file_description: String,
-    pub time_created: usize,
-    pub time_updated: usize,
-    pub subscriptions: u32,
-    pub favorited: u32,
-    pub views: u32,
-    pub tags: Vec<WorkshopItemTag>
 }
 
 impl fmt::Display for WorkshopItem {
@@ -153,71 +139,6 @@ struct WSCollectionChildren {
     sortorder: u8,
     filetype: u8
 }
-// MISC
-
-
-
-
-impl WorkshopSearchItem {
-    /// Converts from a WorkshopSearchItem to a WorkshopItem
-    pub fn to_item(&self) -> WorkshopItem {
-        WorkshopItem {
-            result: self.result.clone(),
-            publishedfileid: self.publishedfileid.clone(),
-            creator: self.creator.clone(),
-            creator_app_id: self.creator_appid.clone(),
-            consumer_app_id: self.consumer_appid.clone(),
-            filename: self.filename.clone(),
-            file_size: self.file_size.parse().unwrap(),
-            file_url: self.file_url.clone(),
-            preview_url: self.preview_url.clone(),
-            hcontent_preview: self.hcontent_preview.clone(),
-            title: self.title.clone(),
-            description: self.file_description.clone(),
-            time_created: self.time_created,
-            time_updated: self.time_updated,
-            subscriptions: self.subscriptions,
-            favorited: self.favorited,
-            views: self.views,
-            tags: self.tags.clone(),
-        }
-    }
-    /// Converts to a WorkshopSearchItem from a WorkshopItem
-    pub fn from_item(item: &WorkshopItem) -> WorkshopSearchItem {
-        WorkshopSearchItem {
-            result: item.result.clone(),
-            publishedfileid: item.publishedfileid.clone(),
-            creator: item.creator.clone(),
-            creator_appid: item.creator_app_id.clone(),
-            consumer_appid: item.consumer_app_id.clone(),
-            filename: item.filename.clone(),
-            file_size: item.file_size.to_string(),
-            file_url: item.file_url.clone(),
-            preview_url: item.preview_url.clone(),
-            hcontent_preview: item.hcontent_preview.clone(),
-            title: item.title.clone(),
-            file_description: item.description.clone(),
-            time_created: item.time_created,
-            time_updated: item.time_updated,
-            subscriptions: item.subscriptions,
-            favorited: item.favorited,
-            views: item.views,
-            tags: item.tags.clone(),
-        }
-    }
-}
-
-impl WorkshopItem {
-    /// Converts from a WorkshopItem to a WorkshopSearchItem
-    pub fn to_search_item(&self) -> WorkshopSearchItem {
-        WorkshopSearchItem::from_item(&self)
-    }
-    /// Converts to a WorkshopItem from a WorkshopSearchItem
-    pub fn from_search_item(sitem: &WorkshopSearchItem) -> WorkshopItem {
-        sitem.to_item()
-    }
-}
-
 pub struct Workshop {
     client: Client,
 }
@@ -247,19 +168,19 @@ impl Workshop {
 
     ///Gets an authorized workshop, allows access to methods that require api keys. 
     ///Get api keys from https://steamcommunity.com/dev/apikey
-    pub fn login(&mut self, apikey: String) -> AuthedWorkshop {
+    pub fn login(self, apikey: String) -> AuthedWorkshop {
         AuthedWorkshop {
             apikey: apikey,
-            client: self.client.clone()
+            client: self.client
         }
     }
 
     /// Allows you to use AuthedWorkshop methods using a proxy to handle.
     /// Public search proxy: https://jackz.me/scripts/workshop.php?mode=search
-    pub fn proxy(&self, url: String) -> ProxyWorkshop {
+    pub fn proxy(self, url: String) -> ProxyWorkshop {
         ProxyWorkshop {
+            url: url,
             client: self.client.clone(),
-            url: url
         }
     }
 
@@ -275,9 +196,6 @@ impl Workshop {
             },
             Err(err) => return Err(err.to_string())
         };
-    
-        // The order in which `read_dir` returns entries is not guaranteed. If reproducible
-        // ordering is required the entries should be explicitly sorted.
     
         entries.sort();
     
@@ -383,7 +301,7 @@ impl AuthedWorkshop {
     }
 
     ///Searches for workshop items, returns full metadata
-    pub fn search_full(&self, appid: u64, query: &str, count: usize) -> Result<Vec<WorkshopSearchItem>, reqwest::Error> {
+    pub fn search_full(&self, appid: u64, query: &str, count: usize) -> Result<Vec<WorkshopItem>, reqwest::Error> {
         let details = self.client.get("https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/?")
             .header("User-Agent", USER_AGENT.to_string())
             .header("Content-Type", "application/x-www-form-urlencoded")
@@ -396,7 +314,7 @@ impl AuthedWorkshop {
                 ("key", &self.apikey),
             ])
             .send()?
-            .json::<WSSearchResponse<WorkshopSearchItem>>()?;
+            .json::<WSSearchResponse<WorkshopItem>>()?;
 
         if details.total > 0 {
             Ok(details.response.unwrap().publishedfiledetails)
@@ -449,7 +367,7 @@ impl ProxyWorkshop {
 
     ///Searches for workshop items, returns full metadata.
     ///Does not require api key by using https://jackz.me/scripts/workshop.php?mode=search
-    pub fn search_full(&self, appid: u64, query: &str, count:usize) -> Result<Vec<WorkshopSearchItem>, reqwest::Error> {
+    pub fn search_full(&self, appid: u64, query: &str, count:usize) -> Result<Vec<WorkshopItem>, reqwest::Error> {
         let details = self.client.get(&self.url)
             .header("User-Agent", USER_AGENT.to_string())
             .header("Content-Type", "application/x-www-form-urlencoded")
@@ -461,7 +379,7 @@ impl ProxyWorkshop {
                 ("return_metadata", "1"),
             ])
             .send()?
-            .json::<WSSearchResponse<WorkshopSearchItem>>()?;
+            .json::<WSSearchResponse<WorkshopItem>>()?;
 
         if details.total > 0 {
             Ok(details.response.unwrap().publishedfiledetails)
