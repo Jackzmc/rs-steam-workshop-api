@@ -5,9 +5,8 @@
 //! To access any web api that requires no authentication (file details) you need to create a new instance:
 //! ```rust
 //! use steam_workshop_api::SteamWorkshop;
-//! 
-//! //Either pass in a Some(reqwest::blocking::Client) or leave None for it to be autocreated
-//! let wsclient = SteamWorkshop::new(None);
+//!
+//! let wsclient = SteamWorkshop::new();
 //! wsclient.get_published_file_details(&["fileid1".to_string()]);
 //! ```
 //! 
@@ -15,21 +14,22 @@
 //! 
 //! Authorized methods are behind the AuthedWorkshop struct, which can be generated from a Workshop instance:
 //! ```rust
-//! use steam_workshop_api::{SteamWorkshop, AuthedWorkshop};
+//! use steam_workshop_api::{SteamWorkshop};
 //! 
-//! let wsclient = SteamWorkshop::new(None);
-//! let authed = wsclient.login("MY_API_KEY");
-//! authed.search_ids(...);
+//! let mut wsclient = SteamWorkshop::new();
+//! wsclient.set_apikey(Some("MY_API_KEY".to_string()));
+//! wsclient.can_subscribe("blah");
 //! ```
 //! # Using Proxied Methods 
 //! 
 //! Proxied methods are identical to AuthedWorkshop, except can use a third party server to proxy (and keep the appkey private)
 //! ```rust
-//! use steam_workshop_api::{SteamWorkshop, ProxyWorkshop};
+//! use steam_workshop_api::{SteamWorkshop};
 //! 
-//! let wsclient = SteamWorkshop::new(None);
-//! let proxy = wsclient.proxy("https://jackz.me/l4d2/scripts/search_public.php");
-//! proxy.search_ids(...);
+//! let wsclient = SteamWorkshop::new();
+//! wsclient.set_proxy_domain("steamproxy.example.com".to_string());
+//! // Does not require .set_apikey, as the proxy will handle it
+//! wsclient.search_items(550, "blah", 10);
 //! ```
 
 use lazy_static::lazy_static;
