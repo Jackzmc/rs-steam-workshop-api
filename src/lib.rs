@@ -4,10 +4,10 @@
 //! # Getting Started
 //! To access any web api that requires no authentication (file details) you need to create a new instance:
 //! ```rust
-//! use steam_workshop_api::Workshop;
+//! use steam_workshop_api::SteamWorkshop;
 //! 
 //! //Either pass in a Some(reqwest::blocking::Client) or leave None for it to be autocreated
-//! let wsclient = Workshop::new(None);
+//! let wsclient = SteamWorkshop::new(None);
 //! wsclient.get_published_file_details(&["fileid1".to_string()]);
 //! ```
 //! 
@@ -15,9 +15,9 @@
 //! 
 //! Authorized methods are behind the AuthedWorkshop struct, which can be generated from a Workshop instance:
 //! ```rust
-//! use steam_workshop_api::{Workshop, AuthedWorkshop};
+//! use steam_workshop_api::{SteamWorkshop, AuthedWorkshop};
 //! 
-//! let wsclient = Workshop::new(None);
+//! let wsclient = SteamWorkshop::new(None);
 //! let authed = wsclient.login("MY_API_KEY");
 //! authed.search_ids(...);
 //! ```
@@ -25,9 +25,9 @@
 //! 
 //! Proxied methods are identical to AuthedWorkshop, except can use a third party server to proxy (and keep the appkey private)
 //! ```rust
-//! use steam_workshop_api::{Workshop, ProxyWorkshop};
+//! use steam_workshop_api::{SteamWorkshop, ProxyWorkshop};
 //! 
-//! let wsclient = Workshop::new(None);
+//! let wsclient = SteamWorkshop::new(None);
 //! let proxy = wsclient.proxy("https://jackz.me/l4d2/scripts/search_public.php");
 //! proxy.search_ids(...);
 //! ```
@@ -39,7 +39,9 @@ lazy_static! {
 }
 
 use serde::{Deserialize, Serialize};
-use std::{fs, io, path::PathBuf, path::Path, collections::HashMap, fmt};
+use std::{fs, path::Path, collections::HashMap, fmt};
+use std::fmt::{Debug, Display, Formatter};
+use std::fs::DirEntry;
 use reqwest::blocking::Client;
 use serde_json::Value;
 
@@ -140,81 +142,82 @@ struct WSCollectionChildren {
     filetype: u8
 }
 #[derive(Clone)]
-pub struct Workshop {
+pub struct SteamWorkshop {
     client: Client,
+    apikey: Option<String>,
+    request_domain: String
 }
 
-pub struct AuthedWorkshop {
-    apikey: String,
-    client: Client,
+pub enum Error {
+    /// Request requires authorization either via an apikey, or using a domain proxy that uses their own key
+    NotAuthorized,
+    RequestError(reqwest::Error)
 }
 
-pub struct ProxyWorkshop {
-    client: Client,
-    url: String
+impl Debug for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Error::NotAuthorized => write!(f, "Request is not authorized, please use .set_apikey, or .set_proxy_domain"),
+            Error::RequestError(e) => write!(f, "request error: {}", e)
+        }
+    }
 }
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Error::NotAuthorized => write!(f, "Not authorized"),
+            Error::RequestError(e) => write!(f, "Request Error: {}", e)
+        }
+    }
+}
+
+impl std::error::Error for Error {}
 
 #[allow(dead_code)]
-impl Workshop {
+impl SteamWorkshop {
     ///Creates a new workshop instance, client will be auto created if None
-    pub fn new(client: Option<Client>) -> Workshop {
-        let client = match client {
-            Some(client) => client,
-            None => Client::new()
-        };
-        Workshop {
+    pub fn new() -> SteamWorkshop {
+        let client= Client::new();
+        SteamWorkshop::new_with_client(client)
+    }
+    pub fn new_with_client(client: Client) -> SteamWorkshop {
+        SteamWorkshop {
             client,
+            request_domain: "api.steampowered.com".to_string(),
+            apikey: None
         }
     }
 
     ///Gets an authorized workshop, allows access to methods that require api keys. 
     ///Get api keys from https://steamcommunity.com/dev/apikey
-    pub fn login(self, apikey: String) -> AuthedWorkshop {
-        AuthedWorkshop {
-            apikey: apikey,
-            client: self.client
-        }
+    pub fn set_apikey(&mut self, apikey: Option<String>) {
+        self.apikey = apikey;
     }
 
-    /// Allows you to use AuthedWorkshop methods using a proxy to handle.
-    /// Public search proxy: https://jackz.me/scripts/workshop.php?mode=search
-    pub fn proxy(&self, url: String) -> ProxyWorkshop {
-        ProxyWorkshop {
-            url: url,
-            client: self.client.clone(),
-        }
+    /// Will change the domain that requests are made to, allowing you to proxy api.steampowered.com
+    pub fn set_proxy_domain(&mut self, proxy_domain: Option<String>) {
+        self.request_domain = proxy_domain.unwrap_or("api.steampowered.com".to_string());
     }
 
-    /// Gets all *.vpk files in a directory
-    pub fn get_vpks_in_folder(dir: &Path) -> Result<Vec<String>, String> {
-        let mut entries: Vec<PathBuf> = match fs::read_dir(dir) {
-            Ok(file) => {
-                match file.map(|res| res.map(|e| e.path()))
-                .collect::<Result<Vec<_>, io::Error>>() {
-                    Ok(files) => files,
-                    Err(err) => return Err(err.to_string())
-                }
-            },
-            Err(err) => return Err(err.to_string())
-        };
-    
-        entries.sort();
-    
-        let mut vpks: Vec<String> = Vec::new();
-    
+    /// Returns DirEntry for all *.vpk files in a directory.
+    pub fn get_vpks_in_folder(dir: &Path) -> Result<Vec<DirEntry>, String> {
+        let entries = fs::read_dir(dir).map_err(|e| e.to_string())?;
+        let mut files: Vec<DirEntry> = Vec::new();
         for entry in entries {
-            if !entry.is_dir() {
-                if let Some("vpk") = entry.extension().and_then(std::ffi::OsStr::to_str) {
-                    vpks.push(entry.file_stem().unwrap().to_str().unwrap().to_owned())
-                }
+            let entry = entry.map_err(|e| e.to_string())?;
+            let file_name = entry.file_name();
+            let file_name = file_name.to_string_lossy();
+            if file_name.ends_with(".vpk") {
+                files.push(entry)
             }
         }
-        
-        Ok(vpks)
+        return Ok(files);
     }
 
     /// Fetches the latest WorkshopItem per each addon id
-    pub fn get_published_file_details(&self, fileids: &[String]) -> Result<Vec<WorkshopItem>, reqwest::Error> {
+    /// Steam API only allows 100 entries at once, will have an api error if more given
+    pub fn get_published_file_details(&self, fileids: &[String]) -> Result<Vec<WorkshopItem>, Error> {
         let mut params = HashMap::new();
         let length = fileids.len().to_string();
         params.insert("itemcount".to_string(), length);
@@ -226,12 +229,12 @@ impl Workshop {
             params.insert(name, vpk.to_string());
         }
         let mut details = self.client
-            .post("https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/")
+            .post(format!("https://{}/ISteamRemoteStorage/GetPublishedFileDetails/v1/", self.request_domain))
             .header("User-Agent", &USER_AGENT.to_string())
             .form(&params)
-            .send()?
-            .error_for_status()?
-            .json::<Value>()?;
+            .send().map_err(|e| Error::RequestError(e))?
+            .error_for_status().map_err(|e| Error::RequestError(e))?
+            .json::<Value>().map_err(|e| Error::RequestError(e))?;
 
         Ok(details["response"]["publishedfiledetails"].as_array_mut().unwrap().iter_mut()
             .filter(|v| v["result"] == 1)
@@ -250,18 +253,20 @@ impl Workshop {
         // Ok(details_final)
     }
 
-    /// Gets the collection details (all the children of this item). Returns a list of children fileids which can be sent directly to get_published_file_details()
-    pub fn get_collection_details(&self, fileid: &str) -> Result<Option<Vec<String>>, reqwest::Error> {
+    /// Gets the collection details (all the children of this item).
+    /// Returns a list of children fileids which can be sent directly to get_published_file_details()
+    /// Will return Ok(None) if the item is not a collection.
+    pub fn get_collection_details(&self, fileid: &str) -> Result<Option<Vec<String>>, Error> {
         let mut params = HashMap::new();
         params.insert("collectioncount", "1");
         params.insert("publishedfileids[0]", &fileid);
         let details: WSCollectionResponse = self.client
-            .post("https://api.steampowered.com/ISteamRemoteStorage/GetCollectionDetails/v1/")
+            .post(format!("https://{}/ISteamRemoteStorage/GetCollectionDetails/v1/", self.request_domain))
             .header("User-Agent", USER_AGENT.to_string())
             .form(&params)
-            .send()?
-            .error_for_status()?
-            .json::<WSCollectionResponse>()?;
+            .send().map_err(|e| Error::RequestError(e))?
+            .error_for_status().map_err(|e| Error::RequestError(e))?
+            .json::<WSCollectionResponse>().map_err(|e| Error::RequestError(e))?;
            
         if details.response.resultcount > 0 { 
             let mut ids: Vec<String>  = Vec::new();
@@ -274,36 +279,14 @@ impl Workshop {
         }
     }
 
-}
-
-impl AuthedWorkshop {
-    ///Search for workshop items, returns only fileids
-    pub fn search_ids(&self, appid: u64, query: &str, count: usize) -> Result<Vec<String>, reqwest::Error> {
-        let details = self.client.get("https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/?")
-            .header("User-Agent", USER_AGENT.to_string())
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .query(&[
-                ("page", "1"),
-                ("numperpage", &count.to_string()),
-                ("search_text", query),
-                ("appid", &appid.to_string()),
-                ("key", &self.apikey),
-            ])
-            .send()?
-            .json::<WSSearchResponse<WSSearchIdBody>>()?;
-
-        let mut fileids: Vec<String> = Vec::new();
-        if details.total > 0 {
-            for res in &details.response.unwrap().publishedfiledetails {
-                fileids.push(res.publishedfileid.to_string());
-            }
+    /// Searches for workshop items, returns their file ids.
+    /// REQUIRES steam apikey or a proxy domain
+    pub fn search_items(&self, appid: u64, query: &str, count: usize) -> Result<Vec<WorkshopItem>, Error> {
+        if self.apikey.is_none() || self.request_domain != "api.steampowered.com" {
+            return Err(Error::NotAuthorized)
         }
-        Ok(fileids)
-    }
-
-    ///Searches for workshop items, returns full metadata
-    pub fn search_full(&self, appid: u64, query: &str, count: usize) -> Result<Vec<WorkshopItem>, reqwest::Error> {
-        let details = self.client.get("https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/?")
+        let apikey: &str = self.apikey.as_deref().unwrap_or("");
+        let details = self.client.get(format!("https://{}/IPublishedFileService/QueryFiles/v1/?", self.request_domain))
             .header("User-Agent", USER_AGENT.to_string())
             .header("Content-Type", "application/x-www-form-urlencoded")
             .query(&[
@@ -312,10 +295,10 @@ impl AuthedWorkshop {
                 ("search_text", query),
                 ("appid", &appid.to_string()),
                 ("return_metadata", "1"),
-                ("key", &self.apikey),
+                ("key", apikey),
             ])
-            .send()?
-            .json::<WSSearchResponse<WorkshopItem>>()?;
+            .send().map_err(|e| Error::RequestError(e))?
+            .json::<WSSearchResponse<WorkshopItem>>().map_err(|e| Error::RequestError(e))?;
 
         if details.total > 0 {
             Ok(details.response.unwrap().publishedfiledetails)
@@ -324,68 +307,24 @@ impl AuthedWorkshop {
         }
     }
 
-    /// Check if the user can subscribe to the published file
-    pub fn can_subscribe(&self, fileid: &str) -> Result<bool, reqwest::Error> {
+    /// Check if the user (of apikey) can subscribe to the published file
+    /// REQUIRES apikey, cannot use proxy.
+    pub fn can_subscribe(&self, fileid: &str) -> Result<bool, Error> {
+        if self.apikey.is_none() {
+            return Err(Error::NotAuthorized)
+        }
+
         let details: Value = self.client
             .get("https://api.steampowered.com/IPublishedFileService/CanSubscribe/v1/?key=7250BBE4BC2ECA0E16197B38E3675988&publishedfileid=122447941")
             .header("User-Agent", USER_AGENT.to_string())
             .query(&[
-                "key", &self.apikey,
+                "key", &self.apikey.as_ref().unwrap(),
                 "publishedfileid", fileid
             ])
-            .send()?
-            .error_for_status()?
-            .json()?;
+            .send().map_err(|e| Error::RequestError(e))?
+            .error_for_status().map_err(|e| Error::RequestError(e))?
+            .json().map_err(|e| Error::RequestError(e))?;
         Ok(details["response"]["can_subscribe"].as_bool().unwrap_or(false))
     }
-}
 
-
-impl ProxyWorkshop {
-    ///Searches for workshop items, returns their file ids
-    pub fn search_ids(&self, appid: u64, query: &str, count: usize) -> Result<Vec<String>, reqwest::Error> {
-        let details = self.client.get(&self.url)
-            .header("User-Agent", USER_AGENT.to_string())
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .query(&[
-                ("page", "1"),
-                ("numperpage", &count.to_string()),
-                ("search_text", query),
-                ("appid", &appid.to_string()),
-                ("v", &env!("CARGO_PKG_VERSION")),
-            ])
-            .send()?
-            .json::<WSSearchResponse<WSSearchIdBody>>()?;
-
-        let mut fileids: Vec<String> = Vec::new();
-        if details.total > 0 {
-            for res in &details.response.unwrap().publishedfiledetails {
-                fileids.push(res.publishedfileid.to_string());
-            }
-        }
-        Ok(fileids)
-    }
-
-    ///Searches for workshop items, returns full metadata.
-    ///Does not require api key by using https://jackz.me/scripts/workshop.php?mode=search
-    pub fn search_full(&self, appid: u64, query: &str, count:usize) -> Result<Vec<WorkshopItem>, reqwest::Error> {
-        let details = self.client.get(&self.url)
-            .header("User-Agent", USER_AGENT.to_string())
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .query(&[
-                ("page", "1"),
-                ("numperpage", &count.to_string()),
-                ("search_text", query),
-                ("appid", &appid.to_string()),
-                ("return_metadata", "1"),
-            ])
-            .send()?
-            .json::<WSSearchResponse<WorkshopItem>>()?;
-
-        if details.total > 0 {
-            Ok(details.response.unwrap().publishedfiledetails)
-        } else {
-            Ok(vec!())
-        }
-    }
 }
