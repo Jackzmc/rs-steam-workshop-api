@@ -26,8 +26,8 @@
 //! ```rust
 //! use steam_workshop_api::{SteamWorkshop};
 //! 
-//! let wsclient = SteamWorkshop::new();
-//! wsclient.set_proxy_domain("steamproxy.example.com".to_string());
+//! let mut wsclient = SteamWorkshop::new();
+//! wsclient.set_proxy_domain(Some("steamproxy.example.com".to_string()));
 //! // Does not require .set_apikey, as the proxy will handle it
 //! wsclient.search_items(550, "blah", 10);
 //! ```
