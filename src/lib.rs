@@ -56,7 +56,7 @@ pub struct WorkshopItem {
     pub consumer_app_id: u32,
     pub filename: String,
     pub file_size: String,
-    pub file_url: String,
+    pub file_url: Option<String>,
     pub preview_url: String,
     pub hcontent_file: String,
     pub hcontent_preview: String,
