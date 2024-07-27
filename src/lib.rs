@@ -55,9 +55,10 @@ pub struct WorkshopItem {
     #[serde(alias = "consumer_appid")]
     pub consumer_app_id: u32,
     pub filename: String,
-    pub file_size: u64,
+    pub file_size: String,
     pub file_url: String,
     pub preview_url: String,
+    pub hcontent_file: String,
     pub hcontent_preview: String,
     pub title: String,
     #[serde(alias = "file_description")]
@@ -67,7 +68,8 @@ pub struct WorkshopItem {
     pub subscriptions: u32,
     pub favorited: u32,
     pub views: u32,
-    pub tags: Vec<WorkshopItemTag>
+    pub tags: Vec<WorkshopItemTag>,
+    pub visibility: u8
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq)]
@@ -151,14 +153,16 @@ pub struct SteamWorkshop {
 pub enum Error {
     /// Request requires authorization either via an apikey, or using a domain proxy that uses their own key
     NotAuthorized,
-    RequestError(reqwest::Error)
+    RequestError(reqwest::Error),
+    BadRequest(String)
 }
 
 impl Debug for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Error::NotAuthorized => write!(f, "Request is not authorized, please use .set_apikey, or .set_proxy_domain"),
-            Error::RequestError(e) => write!(f, "request error: {}", e)
+            Error::RequestError(e) => write!(f, "request error: {}", e),
+            Error::BadRequest(e) => write!(f, "bad request data: {}", e),
         }
     }
 }
@@ -167,7 +171,8 @@ impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Error::NotAuthorized => write!(f, "Not authorized"),
-            Error::RequestError(e) => write!(f, "Request Error: {}", e)
+            Error::RequestError(e) => write!(f, "Request Error: {}", e),
+            Error::BadRequest(e) => write!(f, "Incorrect request: {}", e),
         }
     }
 }
@@ -223,7 +228,7 @@ impl SteamWorkshop {
         params.insert("itemcount".to_string(), length);
         for (i, vpk) in fileids.iter().enumerate() {
             if !vpk.parse::<u64>().is_ok() {
-                panic!("Item is not valid publishedfileid: {}", vpk);
+                return Err(Error::BadRequest(format!("Item is not valid publishedfileid: {}", vpk)));
             }
             let name = format!("publishedfileids[{i}]", i=i);
             params.insert(name, vpk.to_string());
@@ -241,16 +246,6 @@ impl SteamWorkshop {
             .map(|v| serde_json::from_value(v.take()).unwrap())
             .collect()
         )
-
-        // let mut details_final: Vec<WorkshopItem> = Vec::new();
-        //
-        // for detail in details["response"]["publishedfiledetails"] {
-        //     if detail.result == 1 {
-        //         details_final.push(serde_json::from_value(detail).unwrap());
-        //     }
-        // }
-        //
-        // Ok(details_final)
     }
 
     /// Gets the collection details (all the children of this item).
