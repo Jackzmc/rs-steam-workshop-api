@@ -14,7 +14,7 @@
 //! 
 //! Authorized methods are behind the AuthedWorkshop struct, which can be generated from a Workshop instance:
 //! ```rust
-//! use steam_workshop_api::{SteamWorkshop};
+//! use steam_workshop_api::SteamWorkshop;
 //! 
 //! let mut wsclient = SteamWorkshop::new();
 //! wsclient.set_apikey(Some("MY_API_KEY".to_string()));
@@ -24,12 +24,18 @@
 //! 
 //! Proxied methods are identical to AuthedWorkshop, except can use a third party server to proxy (and keep the appkey private)
 //! ```rust
-//! use steam_workshop_api::{SteamWorkshop};
-//! 
+//! use steam_workshop_api::{SearchOptions, SteamWorkshop};
+//!
 //! let mut wsclient = SteamWorkshop::new();
 //! wsclient.set_proxy_domain(Some("steamproxy.example.com".to_string()));
 //! // Does not require .set_apikey, as the proxy will handle it
-//! wsclient.search_items(550, "blah", 10);
+//! wsclient.search_items("blah", &SearchOptions {
+//!        count: 10,
+//!         app_id: 550,
+//!         cursor: None,
+//!         required_tags: None,
+//!         excluded_tags: None,
+//! });
 //! ```
 
 use lazy_static::lazy_static;
@@ -70,6 +76,53 @@ pub struct WorkshopItem {
     pub views: u32,
     pub tags: Vec<WorkshopItemTag>,
     pub visibility: u8
+}
+
+pub enum PublishedFileQueryType {
+    RankedByVote = 0,
+    RankedByPublicationDate = 1,
+    AcceptedForGameRankedByAcceptanceDate = 2,
+    RankedByTrend = 3,
+    FavoritedByFriendsRankedByPublicationDate = 4,
+    CreatedByFriendsRankedByPublicationDate = 5,
+    RankedByNumTimesReported = 6,
+    CreatedByFollowedUsersRankedByPublicationDate = 7,
+    NotYetRated = 8,
+    RankedByTotalUniqueSubscriptions = 9,
+    RankedByTotalVotesAsc = 10,
+    RankedByVotesUp = 11,
+    RankedByTextSearch = 12,
+    RankedByPlaytimeTrend = 13,
+    RankedByTotalPlaytime = 14,
+    RankedByAveragePlaytimeTrend = 15,
+    RankedByLifetimeAveragePlaytime = 16,
+    RankedByPlaytimeSessionsTrend = 17,
+    RankedByLifetimePlaytimeSessions = 18,
+    RankedByInappropriateContentRating = 19,
+    RankedByBanContentCheck = 20,
+    RankedByLastUpdatedDate = 21,
+}
+pub struct SearchTagOptions {
+    tags: Vec<String>,
+    /// If true, requires all tags in tags to be set.
+    /// If false, at least one must match
+    require_all: bool
+}
+pub enum QueryType {
+    /// Sort by trend.
+    /// Days if set, will only return items within the range provided.
+    /// Range must be [1, 7]
+    RankedByTrend { days: Option<u32> }
+}
+#[derive(Default)]
+pub struct SearchOptions {
+    pub count: u32,
+    pub app_id: u32,
+    /// If none, will use "*",
+    pub cursor: Option<String>,
+    pub required_tags: Option<SearchTagOptions>,
+    /// Ignore any entries with these tags
+    pub excluded_tags: Option<Vec<String>>
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq)]
@@ -194,7 +247,7 @@ impl SteamWorkshop {
         }
     }
 
-    ///Gets an authorized workshop, allows access to methods that require api keys. 
+    ///Gets an authorized workshop, allows access to methods that require api keys.
     ///Get api keys from https://steamcommunity.com/dev/apikey
     pub fn set_apikey(&mut self, apikey: Option<String>) {
         self.apikey = apikey;
@@ -262,8 +315,8 @@ impl SteamWorkshop {
             .send().map_err(|e| Error::RequestError(e))?
             .error_for_status().map_err(|e| Error::RequestError(e))?
             .json::<WSCollectionResponse>().map_err(|e| Error::RequestError(e))?;
-           
-        if details.response.resultcount > 0 { 
+
+        if details.response.resultcount > 0 {
             let mut ids: Vec<String>  = Vec::new();
             for children in &details.response.collectiondetails[0].children {
                 ids.push(children.publishedfileid.to_string());
@@ -276,22 +329,33 @@ impl SteamWorkshop {
 
     /// Searches for workshop items, returns their file ids.
     /// REQUIRES steam apikey or a proxy domain
-    pub fn search_items(&self, appid: u64, query: &str, count: usize) -> Result<Vec<WorkshopItem>, Error> {
+    pub fn search_items(&self, query: &str, options: &SearchOptions) -> Result<Vec<WorkshopItem>, Error> {
         if self.apikey.is_none() || self.request_domain != "api.steampowered.com" {
             return Err(Error::NotAuthorized)
         }
         let apikey: &str = self.apikey.as_deref().unwrap_or("");
+        let appid = options.app_id.to_string();
+        let mut query: Vec<(&str, String)> = vec![
+            ("page", "1".to_string()),
+            ("numperpage", options.count.to_string()),
+            ("cursor", options.cursor.as_deref().unwrap_or("*").to_string()),
+            ("search_text", query.to_string()),
+            ("appid", appid.clone()),
+            ("creator_appid", appid),
+            ("return_metadata", "1".to_string()),
+            ("key", apikey.to_string()),
+        ];
+        if let Some(rt) = &options.required_tags {
+            query.push(("requiredtags", rt.tags.join(",")));
+            query.push(("match_all_tags", if rt.require_all { "1".to_string() } else { "0".to_string() }));
+        }
+        if let Some(tags) = &options.excluded_tags {
+            query.push(("excludedtags", tags.join(",")));
+        }
         let details = self.client.get(format!("https://{}/IPublishedFileService/QueryFiles/v1/?", self.request_domain))
             .header("User-Agent", USER_AGENT.to_string())
             .header("Content-Type", "application/x-www-form-urlencoded")
-            .query(&[
-                ("page", "1"),
-                ("numperpage", &count.to_string()),
-                ("search_text", query),
-                ("appid", &appid.to_string()),
-                ("return_metadata", "1"),
-                ("key", apikey),
-            ])
+            .query(&query)
             .send().map_err(|e| Error::RequestError(e))?
             .json::<WSSearchResponse<WorkshopItem>>().map_err(|e| Error::RequestError(e))?;
 
