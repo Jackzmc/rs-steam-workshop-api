@@ -26,8 +26,10 @@ fn test_multiple_items() -> Result<(), Error> {
 
 #[test]
 fn test_search() -> Result<(), Error> {
-    let ws = SteamWorkshop::new();
-    ws.search_items("test", &SearchOptions {
+    let mut ws = SteamWorkshop::new();
+    ws.set_apikey(Some(env!("STEAM_API_KEY").to_string()));
+    ws.search_items(&SearchOptions {
+        query: "test".to_string(),
         count: 10,
         app_id: 550,
         cursor: None,

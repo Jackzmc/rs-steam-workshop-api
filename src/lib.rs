@@ -29,12 +29,13 @@
 //! let mut wsclient = SteamWorkshop::new();
 //! wsclient.set_proxy_domain(Some("steamproxy.example.com".to_string()));
 //! // Does not require .set_apikey, as the proxy will handle it
-//! wsclient.search_items("blah", &SearchOptions {
-//!        count: 10,
-//!         app_id: 550,
-//!         cursor: None,
-//!         required_tags: None,
-//!         excluded_tags: None,
+//! wsclient.search_items(&SearchOptions {
+//!     query: "blah".to_string(),
+//!     count: 10,
+//!     app_id: 550,
+//!     cursor: None,
+//!     required_tags: None,
+//!     excluded_tags: None,
 //! });
 //! ```
 
@@ -48,6 +49,7 @@ use serde::{Deserialize, Serialize};
 use std::{fs, path::Path, collections::HashMap, fmt};
 use std::fmt::{Debug, Display, Formatter};
 use std::fs::DirEntry;
+use log::debug;
 use reqwest::blocking::Client;
 use serde_json::Value;
 
@@ -102,6 +104,8 @@ pub enum PublishedFileQueryType {
     RankedByBanContentCheck = 20,
     RankedByLastUpdatedDate = 21,
 }
+
+#[derive(Clone)]
 pub struct SearchTagOptions {
     tags: Vec<String>,
     /// If true, requires all tags in tags to be set.
@@ -114,15 +118,30 @@ pub enum QueryType {
     /// Range must be [1, 7]
     RankedByTrend { days: Option<u32> }
 }
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct SearchOptions {
     pub count: u32,
     pub app_id: u32,
+    pub query: String,
     /// If none, will use "*",
     pub cursor: Option<String>,
     pub required_tags: Option<SearchTagOptions>,
     /// Ignore any entries with these tags
     pub excluded_tags: Option<Vec<String>>
+}
+
+pub struct SearchResult {
+    options: SearchOptions,
+
+    pub next_cursor: String,
+    pub items: Vec<WorkshopItem>,
+    pub total_items: u32
+}
+
+impl SearchResult {
+    pub fn next(&self, ws: &SteamWorkshop) -> Result<SearchResult, Error> {
+        ws.search_items(&self.options)
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq)]
@@ -145,8 +164,8 @@ pub struct WorkshopItemTag {
 // WORKSHOP ITEMS:
 #[doc(hidden)]
 #[derive(Serialize, Deserialize)]
-struct WSItemResponse<T> {
-    response: WSItemResponseBody<T>
+struct WSResponse<T> {
+    response: T
 }
 #[doc(hidden)]
 #[derive(Serialize, Deserialize)]
@@ -160,12 +179,12 @@ struct WSSearchIdBody {
     publishedfileid: String,
 }
 
-// SEARCH ITEMs
 #[doc(hidden)]
 #[derive(Serialize, Deserialize)]
 struct WSSearchResponse<T> {
-    response: Option<WSItemResponseBody<T>>,
-    total: u8
+    next_cursor: Option<String>,
+    publishedfiledetails: Vec<T>,
+    total: u32
 }
 
 
@@ -329,7 +348,7 @@ impl SteamWorkshop {
 
     /// Searches for workshop items, returns their file ids.
     /// REQUIRES steam apikey or a proxy domain
-    pub fn search_items(&self, query: &str, options: &SearchOptions) -> Result<Vec<WorkshopItem>, Error> {
+    pub fn search_items(&self, options: &SearchOptions) -> Result<SearchResult, Error> {
         if self.apikey.is_none() || self.request_domain != "api.steampowered.com" {
             return Err(Error::NotAuthorized)
         }
@@ -339,7 +358,7 @@ impl SteamWorkshop {
             ("page", "1".to_string()),
             ("numperpage", options.count.to_string()),
             ("cursor", options.cursor.as_deref().unwrap_or("*").to_string()),
-            ("search_text", query.to_string()),
+            ("search_text", options.query.to_string()),
             ("appid", appid.clone()),
             ("creator_appid", appid),
             ("return_metadata", "1".to_string()),
@@ -352,18 +371,29 @@ impl SteamWorkshop {
         if let Some(tags) = &options.excluded_tags {
             query.push(("excludedtags", tags.join(",")));
         }
+        println!("search_items query = {:?}", query);
         let details = self.client.get(format!("https://{}/IPublishedFileService/QueryFiles/v1/?", self.request_domain))
             .header("User-Agent", USER_AGENT.to_string())
             .header("Content-Type", "application/x-www-form-urlencoded")
             .query(&query)
             .send().map_err(|e| Error::RequestError(e))?
-            .json::<WSSearchResponse<WorkshopItem>>().map_err(|e| Error::RequestError(e))?;
+            .json::<WSResponse<WSSearchResponse<WorkshopItem>>>().map_err(|e| Error::RequestError(e))?;
+        let details = details.response;
+        let mut next_options = options.clone();
+        let next_cursor = details.next_cursor.expect("no cursor found");
+        next_options.cursor = Some(next_cursor.clone());
 
-        if details.total > 0 {
-            Ok(details.response.unwrap().publishedfiledetails)
-        } else {
-            Ok(vec!())
-        }
+        Ok(SearchResult {
+            options: next_options,
+            next_cursor,
+            items: details.publishedfiledetails,
+            total_items: details.total
+        })
+        // if details.total > 0 {
+        //     Ok(details.response.unwrap().publishedfiledetails)
+        // } else {
+        //     Ok(vec!())
+        // }
     }
 
     /// Check if the user (of apikey) can subscribe to the published file
