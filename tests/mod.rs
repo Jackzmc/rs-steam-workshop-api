@@ -1,5 +1,15 @@
+use std::sync::OnceLock;
 use steam_workshop_api::*;
 
+
+static WS: OnceLock<SteamWorkshop> = OnceLock::new();
+fn get_workshop() -> &'static SteamWorkshop {
+    WS.get_or_init(|| {
+        let mut client = SteamWorkshop::new();
+        client.set_apikey(Some(env!("STEAM_API_KEY").to_string()));
+        client
+    })
+}
 #[test]
 fn test_one_workshop_item() -> Result<(), Error> {
     let ws = SteamWorkshop::new();
@@ -26,8 +36,7 @@ fn test_multiple_items() -> Result<(), Error> {
 
 #[test]
 fn test_search() -> Result<(), Error> {
-    let mut ws = SteamWorkshop::new();
-    ws.set_apikey(Some(env!("STEAM_API_KEY").to_string()));
+    let ws = get_workshop();
     ws.search_items(&SearchOptions {
         query: "test".to_string(),
         count: 10,
@@ -36,4 +45,12 @@ fn test_search() -> Result<(), Error> {
         required_tags: None,
         excluded_tags: None,
     }).and(Ok(()))
+}
+
+#[test]
+fn test_subscribe_unsubscribe() -> Result<(), Error> {
+    let ws = get_workshop();
+    ws.subscribe("2855027013", false)?;
+    ws.unsubscribe("2855027013")?;
+    Ok(())
 }

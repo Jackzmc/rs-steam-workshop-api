@@ -49,7 +49,6 @@ use serde::{Deserialize, Serialize};
 use std::{fs, path::Path, collections::HashMap, fmt};
 use std::fmt::{Debug, Display, Formatter};
 use std::fs::DirEntry;
-use log::debug;
 use reqwest::blocking::Client;
 use serde_json::Value;
 
@@ -398,17 +397,17 @@ impl SteamWorkshop {
 
     /// Check if the user (of apikey) can subscribe to the published file
     /// REQUIRES apikey, cannot use proxy.
-    pub fn can_subscribe(&self, fileid: &str) -> Result<bool, Error> {
+    pub fn can_subscribe(&self, publishedfileid: &str) -> Result<bool, Error> {
         if self.apikey.is_none() {
             return Err(Error::NotAuthorized)
         }
 
         let details: Value = self.client
-            .get("https://api.steampowered.com/IPublishedFileService/CanSubscribe/v1/?key=7250BBE4BC2ECA0E16197B38E3675988&publishedfileid=122447941")
+            .get(format!("https://{}/IPublishedFileService/CanSubscribe/v1/?", self.request_domain))
             .header("User-Agent", USER_AGENT.to_string())
             .query(&[
                 "key", &self.apikey.as_ref().unwrap(),
-                "publishedfileid", fileid
+                "publishedfileid", publishedfileid
             ])
             .send().map_err(|e| Error::RequestError(e))?
             .error_for_status().map_err(|e| Error::RequestError(e))?
@@ -416,4 +415,47 @@ impl SteamWorkshop {
         Ok(details["response"]["can_subscribe"].as_bool().unwrap_or(false))
     }
 
+    /// Makes the user (of apikey) subscribe to item.
+    /// **REQUIRES apikey**, cannot use proxy.
+    ///
+    /// # Arguments
+    ///
+    /// * `include_dependencies` - If true, will automatically subscribe to all dependencies of given id
+    ///
+    pub fn subscribe(&self, publishedfileid: &str, include_dependencies: bool) -> Result<(), Error> {
+        if self.apikey.is_none() {
+            return Err(Error::NotAuthorized)
+        }
+        self.client
+            .get(format!("https://{}/IPublishedFileService/Subscribe/v1/?", self.request_domain))
+            .header("User-Agent", USER_AGENT.to_string())
+            .query(&[
+                ("list_type", "1"),
+                ("key", &self.apikey.as_deref().unwrap()),
+                ("publishedfileid", publishedfileid),
+                ("include_dependencies", if include_dependencies { "1" } else { "0" })
+            ])
+            .send().map_err(|e| Error::RequestError(e))?
+            .error_for_status().map_err(|e| Error::RequestError(e))?;
+        Ok(())
+    }
+
+    /// Makes the user (of apikey) unsubscribe from an item.
+    /// **REQUIRES apikey**, cannot use proxy.
+    pub fn unsubscribe(&self, publishedfileid: &str) -> Result<(), Error> {
+        if self.apikey.is_none() {
+            return Err(Error::NotAuthorized)
+        }
+        self.client
+            .get(format!("https://{}/IPublishedFileService/Unsubscribe/v1/?", self.request_domain))
+            .header("User-Agent", USER_AGENT.to_string())
+            .query(&[
+                ("list_type", "1"),
+                ("key", &self.apikey.as_deref().unwrap()),
+                ("publishedfileid", publishedfileid),
+            ])
+            .send().map_err(|e| Error::RequestError(e))?
+            .error_for_status().map_err(|e| Error::RequestError(e))?;
+        Ok(())
+    }
 }
