@@ -39,18 +39,18 @@
 //! });
 //! ```
 
-use lazy_static::lazy_static;
+mod search;
 
-lazy_static! {
-    static ref USER_AGENT: String = format!("{}/v{}", "rs-steamwebapi", env!("CARGO_PKG_VERSION"));
-}
+static USER_AGENT: LazyLock<String> = LazyLock::new(|| format!("{}/v{}", "rs-steamwebapi", env!("CARGO_PKG_VERSION")) );
 
 use serde::{Deserialize, Serialize};
 use std::{fs, path::Path, collections::HashMap, fmt};
 use std::fmt::{Debug, Display, Formatter};
 use std::fs::DirEntry;
+use std::sync::LazyLock;
 use reqwest::blocking::Client;
 use serde_json::Value;
+use crate::search::{WSSearchItem, WSSearchResponse};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct WorkshopItem {
@@ -106,10 +106,10 @@ pub enum PublishedFileQueryType {
 
 #[derive(Clone)]
 pub struct SearchTagOptions {
-    tags: Vec<String>,
+    pub tags: Vec<String>,
     /// If true, requires all tags in tags to be set.
     /// If false, at least one must match
-    require_all: bool
+    pub require_all: bool
 }
 pub enum QueryType {
     /// Sort by trend.
@@ -130,10 +130,10 @@ pub struct SearchOptions {
 }
 
 pub struct SearchResult {
-    options: SearchOptions,
+    pub options: SearchOptions,
 
     pub next_cursor: String,
-    pub items: Vec<WorkshopItem>,
+    pub items: Vec<WSSearchItem>,
     pub total_items: u32
 }
 
@@ -155,9 +155,11 @@ impl fmt::Display for WorkshopItem {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct WorkshopItemTag {
-    tag: String
+    pub tag: String,
+    #[serde(rename = "display_name")]
+    pub display_name: Option<String>,
 }
 
 // WORKSHOP ITEMS:
@@ -166,26 +168,6 @@ pub struct WorkshopItemTag {
 struct WSResponse<T> {
     response: T
 }
-#[doc(hidden)]
-#[derive(Serialize, Deserialize)]
-struct WSItemResponseBody<T> {
-    publishedfiledetails: Vec<T>
-}
-#[doc(hidden)]
-#[derive(Serialize, Deserialize)]
-struct WSSearchIdBody {
-    result: u8,
-    publishedfileid: String,
-}
-
-#[doc(hidden)]
-#[derive(Serialize, Deserialize)]
-struct WSSearchResponse<T> {
-    next_cursor: Option<String>,
-    publishedfiledetails: Vec<T>,
-    total: u32
-}
-
 
 // WORKSHOP COLLECTIONS:
 #[doc(hidden)]
@@ -370,13 +352,15 @@ impl SteamWorkshop {
         if let Some(tags) = &options.excluded_tags {
             query.push(("excludedtags", tags.join(",")));
         }
-        println!("search_items query = {:?}", query);
-        let details = self.client.get(format!("https://{}/IPublishedFileService/QueryFiles/v1/?", self.request_domain))
+        let details = self.client
+            .get(format!("https://{}/IPublishedFileService/QueryFiles/v1/?", self.request_domain))
             .header("User-Agent", USER_AGENT.to_string())
-            .header("Content-Type", "application/x-www-form-urlencoded")
             .query(&query)
-            .send().map_err(|e| Error::RequestError(e))?
-            .json::<WSResponse<WSSearchResponse<WorkshopItem>>>().map_err(|e| Error::RequestError(e))?;
+            .body("")
+            .send()
+            .map_err(|e| Error::RequestError(e))?
+            .json::<WSResponse<WSSearchResponse>>()
+            .map_err(|e| Error::RequestError(e))?;
         let details = details.response;
         let mut next_options = options.clone();
         let next_cursor = details.next_cursor.expect("no cursor found");
@@ -388,11 +372,6 @@ impl SteamWorkshop {
             items: details.publishedfiledetails,
             total_items: details.total
         })
-        // if details.total > 0 {
-        //     Ok(details.response.unwrap().publishedfiledetails)
-        // } else {
-        //     Ok(vec!())
-        // }
     }
 
     /// Check if the user (of apikey) can subscribe to the published file
@@ -427,8 +406,9 @@ impl SteamWorkshop {
             return Err(Error::NotAuthorized)
         }
         self.client
-            .get(format!("https://{}/IPublishedFileService/Subscribe/v1/?", self.request_domain))
+            .post(format!("https://{}/IPublishedFileService/Subscribe/v1/?", self.request_domain))
             .header("User-Agent", USER_AGENT.to_string())
+            .body("")
             .query(&[
                 ("list_type", "1"),
                 ("key", &self.apikey.as_deref().unwrap()),
@@ -447,8 +427,9 @@ impl SteamWorkshop {
             return Err(Error::NotAuthorized)
         }
         self.client
-            .get(format!("https://{}/IPublishedFileService/Unsubscribe/v1/?", self.request_domain))
+            .post(format!("https://{}/IPublishedFileService/Unsubscribe/v1/?", self.request_domain))
             .header("User-Agent", USER_AGENT.to_string())
+            .body("")
             .query(&[
                 ("list_type", "1"),
                 ("key", &self.apikey.as_deref().unwrap()),

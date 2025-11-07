@@ -1,15 +1,8 @@
-use std::sync::OnceLock;
 use steam_workshop_api::*;
+use crate::common::get_workshop;
 
+mod common;
 
-static WS: OnceLock<SteamWorkshop> = OnceLock::new();
-fn get_workshop() -> &'static SteamWorkshop {
-    WS.get_or_init(|| {
-        let mut client = SteamWorkshop::new();
-        client.set_apikey(Some(env!("STEAM_API_KEY").to_string()));
-        client
-    })
-}
 #[test]
 fn test_one_workshop_item() -> Result<(), Error> {
     let ws = SteamWorkshop::new();
@@ -48,9 +41,8 @@ fn test_search() -> Result<(), Error> {
 }
 
 #[test]
-fn test_subscribe_unsubscribe() -> Result<(), Error> {
+fn test_subscribe_unsubscribe() {
     let ws = get_workshop();
-    ws.subscribe("2855027013", false)?;
-    ws.unsubscribe("2855027013")?;
-    Ok(())
+    ws.subscribe("2855027013", false).unwrap();
+    ws.unsubscribe("2855027013").unwrap();
 }
